@@ -33,7 +33,7 @@
 #endif 
 
 // define
-#define ARM_UNKONW_INST (0xde01)
+#define ARM_UNKONW_INST (0xdeff)
 #define ERR -1
 #define E_OK 0
 #define E_ARGS 1
@@ -425,6 +425,15 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                 printf("##WIFSTOPPED then PTRACE_CONT, status:%#x , sig:%d \n", status, WSTOPSIG(status));
                 if(WSTOPSIG(status)== SIGILL)
                 {  
+                    if (return_address != 0) {
+                        printf("### recovery breakpoint \n\n");
+                        dump_regs(&regs, stdout);
+                        /* recover return code */
+                        ptrace(PTRACE_POKETEXT, new_child, return_address, return_code);
+                        /* re-set breakpoint at entry address */
+                        ptrace(PTRACE_POKETEXT, new_child, bp->entry_address, bp->entry_code);
+                    }
+
                     if (regs.regs.ARM_pc == return_address) {
                         /* -- at function return */
                         printf("### function return\n");
@@ -454,7 +463,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                         arg2 = regs.regs.ARM_r3;
                         //do_backtrace(new_child);
 #endif
-                        regs.regs.ARM_pc-=4;
+                        regs.regs.ARM_pc-=2;
                         ptrace((__ptrace_request)PTRACE_SETREGS, new_child, 0, &regs);
                     }
                 }
@@ -512,21 +521,22 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                         ptrace((__ptrace_request)PTRACE_SETREGS, new_child, 0, &regs);
                         dump_regs(&regs, stdout);
                     }
-                    if(g_readelf == 0)
-                    {
-                        /* load symbol table*/
-                        addr_maps_build(g_child);
-                        ptr_maps_build(g_child);
-                        symtab_build(g_child);
-                        /* malloc .... breakpoint */
-                        breakpoint_init(g_child);
-                        remove_breakpoint(g_child);
-                        g_readelf = 1;
-
-                        regs.regs.ARM_pc-=2;
-                        ptrace((__ptrace_request)PTRACE_SETREGS, new_child, 0, &regs);
-                    }
                 }
+                if(g_readelf == 0)
+                {
+                    /* load symbol table*/
+                    addr_maps_build(g_child);
+                    ptr_maps_build(g_child);
+                    symtab_build(g_child);
+                    /* malloc .... breakpoint */
+                    breakpoint_init(g_child);
+                    remove_breakpoint(g_child);
+                    g_readelf = 1;
+
+                    regs.regs.ARM_pc-=2;
+                    ptrace((__ptrace_request)PTRACE_SETREGS, new_child, 0, &regs);
+                }
+
                 if(WSTOPSIG(status)== SIGSEGV)
                 {
                     do_backtrace(new_child);
