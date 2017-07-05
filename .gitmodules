@@ -1,0 +1,6 @@
+[submodule "elfutils"]
+	path = elfutils
+	url = git://sourceware.org/git/elfutils.git
+[submodule "libunwind"]
+	path = libunwind
+	url = git://git0.savannah.gnu.org/libunwind.git
