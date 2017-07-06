@@ -55,6 +55,7 @@ static int g_readelf = 0;
 struct breakpoint_s *bp = NULL;
 uintptr_t return_address = 0, return_code = 0;
 uintptr_t arg1 = 0, arg2 = 0;
+unsigned int breaktrap = 0;
 
 // memleax for compile use
 #define BACKTRACE_MAX 50
@@ -429,14 +430,15 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                         printf("### recovery breakpoint \n\n");
                         dump_regs(&regs, stdout);
                         /* recover return code */
-                        ptrace(PTRACE_POKETEXT, new_child, return_address, return_code);
+                        //ptrace(PTRACE_POKETEXT, new_child, return_address, return_code);
                         /* re-set breakpoint at entry address */
-                        ptrace(PTRACE_POKETEXT, new_child, bp->entry_address, bp->entry_code);
+                        //ptrace(PTRACE_POKETEXT, new_child, bp->entry_address, bp->entry_code);
                     }
 
                     if (regs.regs.ARM_pc == return_address) {
                         /* -- at function return */
                         printf("### function return\n");
+                        clearbreakpoint(new_child, return_address, breaktrap);
                         dump_regs(&regs, stdout);
                         return_address = 0;
                         if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
@@ -445,26 +447,28 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                         }
                     }else if ((bp = breakpoint_by_entry(regs.regs.ARM_pc)) != NULL)
                     {
+                        //regs.regs.ARM_pc-=4;
+                        //ptrace((__ptrace_request)PTRACE_SETREGS, new_child, 0, &regs);
+
                         /* recover entry code */
-                        ptrace(PTRACE_POKETEXT, new_child, bp->entry_address, bp->entry_code);
+                        clearbreakpoint(new_child, bp->entry_address, bp->entry_code);
 
                         /* set breakpoint at return address */
                         return_address = regs.regs.ARM_lr - 1;
                         return_code = ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address);
                         //ptrace(PTRACE_POKETEXT, new_child, return_address , ARM_UNKONW_INST);
 #if 1
-                        setbreakpoint(new_child, return_address);
+                        breaktrap = setbreakpoint(new_child, return_address);
                         printf("### function entry\n");
                         printf("### pid:%d, entry address: %#x, entry code:%#x, pc: %#x \n", new_child, bp->entry_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, bp->entry_address), regs.regs.ARM_pc);
-                        printf("### brk in RA: %#x, RA_OPC:%#x \n", return_address & ~0x3, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address & ~0x3));
+                        printf("### brk in RA: %#x, RA_OPC:%#x, breaktrap:%#x \n", return_address & ~0x3, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address & ~0x3), breaktrap);
                         printf("### RA: %#x, RA_OPC:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address));
                         /* save arguments */
                         arg1 = regs.regs.ARM_r2;
                         arg2 = regs.regs.ARM_r3;
                         //do_backtrace(new_child);
 #endif
-                        regs.regs.ARM_pc-=2;
-                        ptrace((__ptrace_request)PTRACE_SETREGS, new_child, 0, &regs);
+                        dump_regs(&regs, stdout);
                     }
                 }
 

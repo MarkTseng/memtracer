@@ -41,7 +41,7 @@ static inline void ptrace_set_data(pid_t pid, uintptr_t address, uintptr_t data)
 }
 static inline void ptrace_set_int3(pid_t pid, uintptr_t address, uintptr_t code)
 {
-	ptrace_set_data(pid, address & ~0x3,  (code & ~0xffff) | 0xdeff);
+	ptrace_set_data(pid, address ,  0xe7ffffff);
 }
 
 static inline uintptr_t ptrace_get_child(pid_t pid)

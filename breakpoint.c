@@ -70,10 +70,10 @@ static void do_breakpoint_init(pid_t pid, struct breakpoint_s *bp,
 
 void breakpoint_init(pid_t pid)
 {
-	//do_breakpoint_init(pid, &g_breakpoints[0], "malloc", bph_malloc);
-	//do_breakpoint_init(pid, &g_breakpoints[1], "free", bph_free);
-	//do_breakpoint_init(pid, &g_breakpoints[2], "realloc", bph_realloc);
-	do_breakpoint_init(pid, &g_breakpoints[3], "say_hello", bph_calloc);
+	do_breakpoint_init(pid, &g_breakpoints[0], "malloc", bph_malloc);
+	do_breakpoint_init(pid, &g_breakpoints[1], "free", bph_free);
+	do_breakpoint_init(pid, &g_breakpoints[2], "realloc", bph_realloc);
+	do_breakpoint_init(pid, &g_breakpoints[3], "calloc", bph_calloc);
 }
 
 void breakpoint_cleanup(pid_t pid)
