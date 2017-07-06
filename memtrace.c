@@ -64,8 +64,6 @@ pid_t g_current_thread;
 int opt_backtrace_limit = BACKTRACE_MAX;
 const char *opt_debug_info_file;
 
-static pid_t g_target_pid;
-static int g_signo = 0;
 
 
 const char* demangle(const char* name)
@@ -152,7 +150,6 @@ void writechildword(pid_t pid, unsigned long addr, unsigned long word)
 {
 	unsigned long check;
 
-	printf("wrote 0x%08lx to %ld:0x%x\n", word, pid, addr);
 	/* write word to child process */
 	if (ptrace(PTRACE_POKETEXT, pid, addr, word)) {
 		printf( "writechildword ptrace_poketext error: %s\n", strerror(errno));
@@ -421,7 +418,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
             new_child = waitpid(-1, &status, __WALL);
             memset(&regs, 0, sizeof(regs));
             ptrace((__ptrace_request)PTRACE_GETREGS, new_child, NULL, &regs);
-            dump_regs(&regs, stdout);
+            //dump_regs(&regs, stdout);
             if (WIFSTOPPED(status)) {
                 printf("##WIFSTOPPED then PTRACE_CONT, status:%#x , sig:%d \n", status, WSTOPSIG(status));
                 if(WSTOPSIG(status)== SIGILL)
@@ -430,7 +427,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                         /* -- at function return */
                         printf("### function return\n");
                         clearbreakpoint(new_child, return_address, breaktrap);
-                        dump_regs(&regs, stdout);
+                        //dump_regs(&regs, stdout);
                         return_address = 0;
                         if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
                             printf("\n== Not enough memory.\n");
@@ -453,71 +450,20 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 #if 1
                         breaktrap = setbreakpoint(new_child, return_address);
                         printf("### function entry\n");
-                        printf("### pid:%d, entry address: %#x, entry code:%#x, pc: %#x \n", new_child, bp->entry_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, bp->entry_address), regs.regs.ARM_pc);
-                        printf("### brk in RA: %#x, RA_OPC:%#x, breaktrap:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address & ~0x3), breaktrap);
-                        printf("### RA: %#x, RA_OPC:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address));
+                        //printf("### pid:%d, entry address: %#x, entry code:%#x, pc: %#x \n", new_child, bp->entry_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, bp->entry_address), regs.regs.ARM_pc);
+                        //printf("### brk in RA: %#x, RA_OPC:%#x, breaktrap:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address & ~0x3), breaktrap);
+                        //printf("### RA: %#x, RA_OPC:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address));
                         /* save arguments */
                         arg1 = regs.regs.ARM_r0;
                         arg2 = regs.regs.ARM_r1;
                         //do_backtrace(new_child);
 #endif
-                        dump_regs(&regs, stdout);
+                        //dump_regs(&regs, stdout);
                     }
                 }
-
                 if(WSTOPSIG(status)== SIGTRAP)
                 {
-                    //memset(&regs, 0, sizeof(regs));
-                    //ptrace((__ptrace_request)PTRACE_GETREGS, new_child, NULL, &regs);
-                    //dump_regs(&regs, stdout);
                     
-                    /* breaking after a function-entry-breakpoint, which means
-                     * we are at the function-return-breakpoint, or at another
-                     * function-entry-breakpoint. In the latter case, we ignore
-                     * the formor function-entry-breakpoint. */
-                    if (return_address != 0) {
-                        printf("### recovery breakpoint \n\n");
-                        dump_regs(&regs, stdout);
-                        /* recover return code */
-                        ptrace(PTRACE_POKETEXT, new_child, return_address, return_code);
-                        /* re-set breakpoint at entry address */
-	                    ptrace(PTRACE_POKETEXT, new_child, bp->entry_address, bp->entry_code);
-                    }
-
-                    if (regs.regs.ARM_pc == return_address) {
-                        /* -- at function return */
-                        printf("### function return\n");
-                        dump_regs(&regs, stdout);
-                        return_address = 0;
-                        if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
-                            printf("\n== Not enough memory.\n");
-                            break;
-                        }
-                    } 
-                    else if ((bp = breakpoint_by_entry(regs.regs.ARM_pc -1)) != NULL) 
-                    {
-                        /* -- at function entry */
-
-                        /* recover entry code */
-                        ptrace(PTRACE_POKETEXT, new_child, bp->entry_address, bp->entry_code);
-
-                        /* set breakpoint at return address */
-                        return_address = regs.regs.ARM_lr;
-                        return_code = ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address);
-                        //ptrace(PTRACE_POKETEXT, new_child, return_address , ARM_UNKONW_INST);
-                        setbreakpoint(new_child, return_address);
-                        printf("### function entry\n");
-                        printf("### pid:%d, entry address: %#x, entry code:%#x, pc: %#x \n", new_child, bp->entry_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, bp->entry_address), regs.regs.ARM_pc);
-                        printf("### brk in RA: %#x, RA_OPC:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address & ~0x3));
-                        printf("### RA: %#x, RA_OPC:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address));
-                        /* save arguments */
-                        arg1 = regs.regs.ARM_r0;
-                        arg2 = regs.regs.ARM_r1;
-                        //do_backtrace(new_child);
-                        //regs.regs.ARM_pc-=2;
-                        //ptrace((__ptrace_request)PTRACE_SETREGS, new_child, 0, &regs);
-                        dump_regs(&regs, stdout);
-                    }
                 }
                 if(g_readelf == 0)
                 {

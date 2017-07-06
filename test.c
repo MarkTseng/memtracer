@@ -19,7 +19,8 @@ int main(int argc, char **argv)
 
     while(i<100)
     {
-        p = malloc(100);
+        p = malloc(40960);
+        printf("p:%p\n", p);
         say_hello(0x255, 0x256, 0x257);
         sleep(1);
         free(p);
