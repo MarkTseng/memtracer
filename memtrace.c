@@ -457,8 +457,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                         printf("### brk in RA: %#x, RA_OPC:%#x, breaktrap:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address & ~0x3), breaktrap);
                         printf("### RA: %#x, RA_OPC:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address));
                         /* save arguments */
-                        arg1 = regs.regs.ARM_r2;
-                        arg2 = regs.regs.ARM_r3;
+                        arg1 = regs.regs.ARM_r0;
+                        arg2 = regs.regs.ARM_r1;
                         //do_backtrace(new_child);
 #endif
                         dump_regs(&regs, stdout);
@@ -511,8 +511,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                         printf("### brk in RA: %#x, RA_OPC:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address & ~0x3));
                         printf("### RA: %#x, RA_OPC:%#x \n", return_address, ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address));
                         /* save arguments */
-                        arg1 = regs.regs.ARM_r2;
-                        arg2 = regs.regs.ARM_r3;
+                        arg1 = regs.regs.ARM_r0;
+                        arg2 = regs.regs.ARM_r1;
                         //do_backtrace(new_child);
                         //regs.regs.ARM_pc-=2;
                         //ptrace((__ptrace_request)PTRACE_SETREGS, new_child, 0, &regs);
