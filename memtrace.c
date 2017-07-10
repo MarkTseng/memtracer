@@ -483,6 +483,7 @@ pthread_mutex_lock(&pid_mutex);
 							/*restore instruction(s)*/
 							//printf("### recovery breakpoint: entry_address:%#x \n\n", brp->entry_addr);
 							breaktrap = breaktrap = setbreakpoint(new_child, brp->entry_addr);
+							free(brp);
 						}
 					}
 				}
