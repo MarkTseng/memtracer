@@ -8,5 +8,6 @@ arm linux platform memory leak debug tool
 # reference project
 * [memleax - x86_64](https://github.com/WuBingzheng/memleax)
 * [bps - arm/mips/x86](http://rtfc.org.uk/bps.html)
+* [mdb - x86 debugger](https://bitbucket.org/iabdelkader/mdb)
 * [play ptrace - part I](http://www.linuxjournal.com/article/6100)
 * [play ptrace - part II](http://www.linuxjournal.com/article/6210)
