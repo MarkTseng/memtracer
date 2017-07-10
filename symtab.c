@@ -86,7 +86,7 @@ static int symtab_build_section(Elf *elf, Elf_Scn *section,
 		sym->size = esym->st_size;
 		sym->weak = (ELF32_ST_BIND(esym->st_info) == STB_WEAK);
 
-    	printf("[%s][%d] name: %s, addr:%#x \n", __func__, __LINE__, sym->name, sym->address);
+    	//printf("[%s][%d] name: %s, addr:%#x \n", __func__, __LINE__, sym->name, sym->address);
 		count++;
 	}
 	return count;
@@ -122,7 +122,7 @@ static int symtab_build_file(const char *path, uintptr_t start, uintptr_t end)
 		return -1;
 	}
 	
-    printf("[%s][%d] open lib: %s \n", __func__, __LINE__, path);
+    //printf("[%s][%d] open lib: %s \n", __func__, __LINE__, path);
 
 	elf_version(EV_CURRENT);
 	Elf *elf = elf_begin(fd, ELF_C_READ, NULL);

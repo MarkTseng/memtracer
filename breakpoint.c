@@ -22,28 +22,28 @@ struct breakpoint_s g_breakpoints[MAX_BREAKPINT_NUM];
 
 static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
-	log_debug("-- malloc size:%ld ret:%lx\n", size, pointer);
+	//log_debug("-- malloc size:%ld ret:%lx\n", size, pointer);
 
 	return 0;
 }
 
 static int bph_free(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	log_debug("-- free point:%lx\n", pointer);
+	//log_debug("-- free point:%lx\n", pointer);
 
 	return 0;
 }
 
 static int bph_realloc(uintptr_t new_pointer, uintptr_t old_pointer, uintptr_t size)
 {
-	log_debug("-- realloc pointer:%lx->%lx size:%ld\n", old_pointer, new_pointer, size);
+	//log_debug("-- realloc pointer:%lx->%lx size:%ld\n", old_pointer, new_pointer, size);
 
 	return 0;
 }
 
 static int bph_calloc(uintptr_t pointer, uintptr_t nmemb, uintptr_t size)
 {
-	log_debug("-- calloc pointer:%lx nmemb:%ld size:%ld\n", pointer, nmemb, size);
+	//log_debug("-- calloc pointer:%lx nmemb:%ld size:%ld\n", pointer, nmemb, size);
 
 	return 0;
 }
