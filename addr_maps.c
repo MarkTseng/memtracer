@@ -36,7 +36,7 @@ static void addr_maps_build_file(const char *path, size_t start, size_t end)
 		memcpy(am->name, p + 1, q - p + 2);
 		am->name[q - p + 2] = '\0';
 	}
-    printf("[%s][%d] %s \n", __func__, __LINE__, am->name);
+    //printf("[%s][%d] %s \n", __func__, __LINE__, am->name);
 }
 
 void addr_maps_build(pid_t pid)

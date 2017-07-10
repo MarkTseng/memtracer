@@ -5,7 +5,14 @@
 
 int say_hello(int x, int y, int z)
 {
+    char *p1, *p2;
+    p1 = malloc(1024);
+    p2 = calloc(1,4096);
+    printf("p1:%p\n", p1);
+    printf("p2:%p\n", p2);
     printf("Hello, RA:%#x \n", __builtin_return_address(0));
+    free(p1);
+    free(p2);
     return 100;
 }
 

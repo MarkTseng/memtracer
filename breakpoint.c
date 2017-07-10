@@ -17,8 +17,8 @@
 #include "ptrace_utils.h"
 #include "symtab.h"
 #include "minigdb.h"
-
-struct breakpoint_s g_breakpoints[4];
+#define MAX_BREAKPINT_NUM (4)
+struct breakpoint_s g_breakpoints[MAX_BREAKPINT_NUM];
 
 static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
@@ -79,7 +79,7 @@ void breakpoint_init(pid_t pid)
 void breakpoint_cleanup(pid_t pid)
 {
 	int i;
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < MAX_BREAKPINT_NUM; i++) {
 		struct breakpoint_s *bp = &g_breakpoints[i];
 		ptrace_set_data(pid, bp->entry_address, bp->entry_code);
 	}
@@ -88,7 +88,7 @@ void breakpoint_cleanup(pid_t pid)
 struct breakpoint_s *breakpoint_by_entry(uintptr_t address)
 {
 	int i;
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < MAX_BREAKPINT_NUM; i++) {
 		if (address == g_breakpoints[i].entry_address) {
 			return &g_breakpoints[i];
 		}
@@ -99,7 +99,7 @@ struct breakpoint_s *breakpoint_by_entry(uintptr_t address)
 void breakpoint_clear_by_entry(uintptr_t address)
 {
 	int i;
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < MAX_BREAKPINT_NUM; i++) {
 		if (address == g_breakpoints[i].entry_address) {
 			memset(&g_breakpoints[i],0,sizeof(struct breakpoint_s));
 		}

@@ -41,7 +41,7 @@ static void ptr_maps_build_file(const char *path, size_t start, size_t end)
 		printf("Warning: error in open map of %s: %s\n", path, strerror(errno));
 		return;
 	}
-    printf("[%s](%d) open: %s\n", __func__, __LINE__, path);
+    //printf("[%s](%d) open: %s\n", __func__, __LINE__, path);
 	ssize_t rlen = read(fd, ms->data, end - start);
 	if (rlen < 0) {
 		printf("Warning: error in read map of %s: %s\n", path, strerror(errno));
