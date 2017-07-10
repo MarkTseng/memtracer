@@ -100,7 +100,7 @@ const char* demangle(const char* name)
 #endif 
 
 long main_orig_opc = 0;
-#define MAIN_ADDRESS (0x84f8)
+#define MAIN_ADDRESS (0x10578)
 //#define MAIN_ADDRESS (0x41c40)
 void set_breakpoint(pid_t child)
 {
@@ -200,7 +200,7 @@ unsigned int setbreakpoint(pid_t exe, unsigned long breakaddr)
 	}
 
 	if ((!thumb) && (addr & 0x2)) {
-		printf( "setbreakpoint: arm, address misalignment, 0x%x\n", addr);
+		printf( "setbreakpoint: arm, address misalignment, 0x%lx\n", addr);
 		exit(E_UNKNOWN);
 	}
 
@@ -267,7 +267,7 @@ void clearbreakpoint(pid_t exe, unsigned long breakaddr, unsigned int origint)
 	}
 
 	if ((!thumb) && (addr & 0x2)) {
-		printf( "clearbreakpoint: arm, address misalignment, 0x%x\n", addr);
+		printf( "clearbreakpoint: arm, address misalignment, 0x%lx\n", addr);
 		exit(E_UNKNOWN);
 	}
 
@@ -310,14 +310,14 @@ void clearbreakpoint(pid_t exe, unsigned long breakaddr, unsigned int origint)
 
 static void dump_regs(struct user const *regs, FILE *outfp)
 {
-    fprintf(outfp, "cpsr = 0x%08x, pc = 0x%08x\n", regs->regs.ARM_cpsr, regs->regs.ARM_pc);
-    fprintf(outfp, "lr   = 0x%08x, sp = 0x%08x\n", regs->regs.ARM_lr, regs->regs.ARM_sp);
-    fprintf(outfp, "ip   = 0x%08x, fp = 0x%08x\n", regs->regs.ARM_ip, regs->regs.ARM_fp);
-    fprintf(outfp, "r0   = 0x%08x, r1 = 0x%08x\n", regs->regs.ARM_r0, regs->regs.ARM_r1);
-    fprintf(outfp, "r2   = 0x%08x, r3 = 0x%08x\n", regs->regs.ARM_r2, regs->regs.ARM_r3);
-    fprintf(outfp, "r4   = 0x%08x, r5 = 0x%08x\n", regs->regs.ARM_r4, regs->regs.ARM_r5);
-    fprintf(outfp, "r6   = 0x%08x, r7 = 0x%08x\n", regs->regs.ARM_r6, regs->regs.ARM_r7);
-    fprintf(outfp, "r8   = 0x%08x, r9 = 0x%08x\n", regs->regs.ARM_r8, regs->regs.ARM_r9);
+    fprintf(outfp, "cpsr = 0x%08lx, pc = 0x%08lx\n", regs->regs.ARM_cpsr, regs->regs.ARM_pc);
+    fprintf(outfp, "lr   = 0x%08lx, sp = 0x%08lx\n", regs->regs.ARM_lr, regs->regs.ARM_sp);
+    fprintf(outfp, "ip   = 0x%08lx, fp = 0x%08lx\n", regs->regs.ARM_ip, regs->regs.ARM_fp);
+    fprintf(outfp, "r0   = 0x%08lx, r1 = 0x%08lx\n", regs->regs.ARM_r0, regs->regs.ARM_r1);
+    fprintf(outfp, "r2   = 0x%08lx, r3 = 0x%08lx\n", regs->regs.ARM_r2, regs->regs.ARM_r3);
+    fprintf(outfp, "r4   = 0x%08lx, r5 = 0x%08lx\n", regs->regs.ARM_r4, regs->regs.ARM_r5);
+    fprintf(outfp, "r6   = 0x%08lx, r7 = 0x%08lx\n", regs->regs.ARM_r6, regs->regs.ARM_r7);
+    fprintf(outfp, "r8   = 0x%08lx, r9 = 0x%08lx\n", regs->regs.ARM_r8, regs->regs.ARM_r9);
     fprintf(outfp, "\n");
 }
 
@@ -394,7 +394,6 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 	pthread_mutex_init(&pid_mutex,NULL);
 	g_child = fork();
-    long newpid = 0;
 
     // setup libunwind
 	as = unw_create_addr_space(&_UPT_accessors, 0);
@@ -415,18 +414,16 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
         printf("g_child: %d\n", g_child);
         printf("g_mainPid: %d\n", g_mainPid);
 			
-		int status,w;
+		int status;
       
-#if 1 
 		new_child = waitpid(-1, &status, __WALL);
 		if (WIFSTOPPED(status)) {
-			printf("### pid: %ld, stop signal: %d\n", new_child, WSTOPSIG(status));  
+			printf("### pid: %d, stop signal: %d\n", new_child, WSTOPSIG(status));  
 			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC);
             /* breakpoint in main */
             set_breakpoint(g_child);
 		}
 		ptrace(PTRACE_CONT,new_child, NULL, NULL);
-#endif
         /* trace pid */
 		while(1) {
             new_child = waitpid(-1, &status, __WALL);
@@ -470,7 +467,7 @@ pthread_mutex_lock(&pid_mutex);
 							//dump_regs(&regs, stdout);
 							g_entryCnt--;
 							HASH_DEL(brptab, brp);
-							//do_backtrace(new_child);
+							do_backtrace(new_child);
 
 							/* -- at function return */
 							//printf("### function return: RA:%#x, g_entryCnt=%d\n", brp->return_addr, g_entryCnt);
@@ -482,7 +479,7 @@ pthread_mutex_lock(&pid_mutex);
 							}
 							/*restore instruction(s)*/
 							//printf("### recovery breakpoint: entry_address:%#x \n\n", brp->entry_addr);
-							breaktrap = breaktrap = setbreakpoint(new_child, brp->entry_addr);
+							breaktrap = setbreakpoint(new_child, brp->entry_addr);
 							free(brp);
 						}
 					}
@@ -493,7 +490,6 @@ pthread_mutex_lock(&pid_mutex);
 				}
 				if(WSTOPSIG(status)== SIGINT)
 				{
-					breakpoint_cleanup(g_child);
 					ptrace(PTRACE_CONT,g_child, NULL, SIGINT);
 					break;
                 }
@@ -511,7 +507,7 @@ pthread_mutex_lock(&pid_mutex);
 				if(WSTOPSIG(status)== SIGSEGV)
                 {
                     do_backtrace(new_child);
-                    printf("### [SIGSEGV] pid: %ld, stop signal: %d\n", new_child, WSTOPSIG(status));  
+                    printf("### [SIGSEGV] pid: %d, stop signal: %d\n", new_child, WSTOPSIG(status));  
                     dump_regs(&regs, stdout);
 
                     break;
@@ -519,22 +515,24 @@ pthread_mutex_lock(&pid_mutex);
                 ptrace(PTRACE_CONT,new_child, NULL, NULL);
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
-				printf("### PTRACE_EVENT_EXEC %ld, \n", new_child);  
+				printf("### PTRACE_EVENT_EXEC %d, \n", new_child);  
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8))) {
-				printf("### PTRACE_EVENT_CLONE %ld\n", new_child);  
+				printf("### PTRACE_EVENT_CLONE %d\n", new_child);  
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
-				printf("### PTRACE_EVENT_VLONE %ld\n", new_child);  
+				printf("### PTRACE_EVENT_VLONE %d\n", new_child);  
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK_DONE<<8))) {
-				printf("### PTRACE_EVENT_VFORK_DONE %ld\n", new_child);  
+				printf("### PTRACE_EVENT_VFORK_DONE %d\n", new_child);  
 			}
 			if (status >>8 == PTRACE_EVENT_FORK) {
-				printf("### PTRACE_EVENT_FORK %ld\n", new_child);  
+				printf("### PTRACE_EVENT_FORK %d\n", new_child);  
 			}
 			if(WIFEXITED(status)) {
 				printf("### new_child %d exited\n", new_child);
+				if(new_child==-1)
+					break;
 				if(new_child==g_child)
 					break;
 			}
@@ -542,8 +540,10 @@ pthread_mutex_unlock(&pid_mutex);
 		}
 	}
 
+	breakpoint_cleanup(g_child);
 	pthread_mutex_destroy(&pid_mutex);
 	unw_destroy_addr_space(as);
+	printf("memtrace exit\n");
 	return 0;
 }
 #ifdef __cplusplus 
