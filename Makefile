@@ -1,5 +1,5 @@
 CFLAGS =  -DMLX_LINUX -DMLX_WITH_LIBDW -I/home/mark/myResearch/elfutils-0.165/ARM_LIBS/include/elfutils -I/home/mark/myResearch/elfutils-0.165/ARM_LIBS/include -g -O2 -Wall -I/home/mark/myResearch/libunwind/LIBUNWIND_ARM/include 
-LDLIBS =  -L/home/mark/myResearch/libunwind/LIBUNWIND_ARM/lib -L/home/mark/myResearch/elfutils-0.165/ARM_LIBS/lib -L/home/mark/myResearch/elfutils-0.165/ARM_LIBS/lib/elfutils -L/home/mark/nfs/ARM_LIBS/lib -lunwind-ptrace -lunwind -lunwind-arm -lelf -ldw -lz 
+LDLIBS =  -L/home/mark/myResearch/libunwind/LIBUNWIND_ARM/lib -L/home/mark/myResearch/elfutils-0.165/ARM_LIBS/lib -L/home/mark/myResearch/elfutils-0.165/ARM_LIBS/lib/elfutils -L/home/mark/nfs/ARM_LIBS/lib -lunwind-ptrace -lunwind -lunwind-arm -lelf -ldw -lz -pthread 
 #CFLAGS =  -DMLX_LINUX -DMLX_WITH_LIBDW -I/usr/include/elfutils/ -g -O2 -Wall -DX86_64
 #LDLIBS =  -lunwind-ptrace -lunwind -lunwind-x86_64 -lelf -ldw -lreadline
 LDFLAGS = 
@@ -10,22 +10,28 @@ CXX = arm-linux-gnueabihf-g++
 #CC = gcc
 TARGET = memtrace
 TARGET2 = test
+TARGET3 = elf_parser
 
 SOURCES = breakpoint.c debug_file.c debug_line.c ptr_backtrace.c callstack.c memblock.c proc_info.c symtab.c addr_maps.c
 OBJS = breakpoint.o debug_file.o debug_line.o ptr_backtrace.o callstack.o memblock.o proc_info.o symtab.o addr_maps.o
 
-all: $(TARGET) $(TARGET2) 
+all: $(TARGET) $(TARGET2) $(TARGET3) 
 
 $(TARGET) : $(OBJS) memtrace.c
 	 arm-linux-gnueabihf-g++ -g -c memtrace.c $(CFLAGS)
 	 arm-linux-gnueabihf-g++ -g -o memtrace memtrace.o $(OBJS) $(LDLIBS)
-	 cp memtrace ~/nfs/ && sync
+	 cp $(TARGET) ~/nfs/ && sync
 
 $(TARGET2) : test.o
 	$(CC) -g -o test test.c
 
+$(TARGET3) : elf_parser.o
+	$(CC) -g -c elf_parser.c $(CFLAGS) 
+	$(CC) -g -o elf_parser elf_parser.o $(LDLIBS)
+	cp $(TARGET3) ~/nfs/ && sync
+
 clean :
-	rm -f *.o $(TARGET) $(TARGET2) 
+	rm -f *.o $(TARGET) $(TARGET2) $(TARGET3)
 
 install :
 	mkdir -p $(DESTDIR)$(PREFIX)/bin/
@@ -50,4 +56,3 @@ memblock.o: memblock.c hash.h list.h memblock.h callstack.h \
 proc_info.o: proc_info.c proc_info.h
 symtab.o: symtab.c array.h minigdb.h proc_info.h debug_file.h
 addr_maps.o: addr_maps.c addr_maps.h proc_info.h array.h
-test.o: test.c

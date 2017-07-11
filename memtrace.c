@@ -44,8 +44,8 @@
 #define E_FORK 3
 #define E_PTRACE 4
 #define E_UNKNOWN 5
-#define TRAPINT 0xe7ffffff
-#define TRAPHALF 0xdeff
+#define TRAPINT (0xe7ffffff)
+#define TRAPHALF (0xdeff)
 
 
 // global variable
@@ -70,6 +70,10 @@ typedef struct{
     UT_hash_handle hh; /*uthash handle*/
 }breakPointTable, brpSymbol;
 breakPointTable *brptab=NULL, *brp;
+
+struct symbol *symbols = NULL;
+int symtot = 0;
+unsigned long main_addr = 0;
 
 // memleax for compile use
 #define BACKTRACE_MAX 50
@@ -100,8 +104,7 @@ const char* demangle(const char* name)
 #endif 
 
 long main_orig_opc = 0;
-#define MAIN_ADDRESS (0x10578)
-//#define MAIN_ADDRESS (0x41c40)
+#define MAIN_ADDRESS  main_addr
 void set_breakpoint(pid_t child)
 {
     int status;
@@ -382,13 +385,19 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
         exit(-1);
     }
 
-    const char *path = argv[1];
-    const char *name = strrchr(path, '/');
+    char *path = argv[1];
+    char *name = strrchr(path, '/');
     if(name){
         name += 1;        
     }else{
         name = path;
     }
+
+    symtot = readsyms(&symbols, path, 0, 0);
+    //printf("elf symbol:%d\n", symtot);
+    //display_symbols(symbols, symtot);
+    main_addr = symaddr(symbols, symtot, "main");
+    printf("main addr = %#lx\n", main_addr);
 
 	signal(SIGINT, signal_handler);
 
@@ -467,7 +476,7 @@ pthread_mutex_lock(&pid_mutex);
 							//dump_regs(&regs, stdout);
 							g_entryCnt--;
 							HASH_DEL(brptab, brp);
-							do_backtrace(new_child);
+							//do_backtrace(new_child);
 
 							/* -- at function return */
 							//printf("### function return: RA:%#x, g_entryCnt=%d\n", brp->return_addr, g_entryCnt);
