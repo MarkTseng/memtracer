@@ -378,6 +378,8 @@ static void signal_handler(int signo)
 int main(int argc __attribute__((unused)), char **argv, char **envp) 
 {
 	pid_t new_child;
+	pid_t clone_child;
+	int maxChildPid=0;
 
     if(argc == 1)
     {
@@ -436,7 +438,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
         /* trace pid */
 		while(1) {
             new_child = waitpid(-1, &status, __WALL);
-pthread_mutex_lock(&pid_mutex);
+			pthread_mutex_lock(&pid_mutex);
             memset(&regs, 0, sizeof(regs));
             ptrace((__ptrace_request)PTRACE_GETREGS, new_child, NULL, &regs);
             //dump_regs(&regs, stdout);
@@ -515,29 +517,53 @@ pthread_mutex_lock(&pid_mutex);
 				}
 				if(WSTOPSIG(status)== SIGSEGV)
                 {
-                    do_backtrace(new_child);
-                    printf("### [SIGSEGV] pid: %d, stop signal: %d\n", new_child, WSTOPSIG(status));  
-                    dump_regs(&regs, stdout);
-
+					int i;
+					for(i=g_child;i<=maxChildPid;i++)
+                    {
+						printf("### [SIGSEGV] pid: %d, stop signal: %d\n", new_child, WSTOPSIG(status));  
+                    	do_backtrace(i);
+                    }
+					dump_regs(&regs, stdout);
                     break;
                 }
-                ptrace(PTRACE_CONT,new_child, NULL, NULL);
+				ptrace(PTRACE_CONT,new_child, NULL, NULL);
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
 				printf("### PTRACE_EVENT_EXEC %d, \n", new_child);  
+				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
+				printf("### PTRACE_EVENT_EXEC child %d\n", clone_child);  
+				if(maxChildPid < clone_child)
+					maxChildPid = clone_child;
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8))) {
 				printf("### PTRACE_EVENT_CLONE %d\n", new_child);  
+				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
+				printf("### PTRACE_EVENT_CLONE child %d\n", clone_child);  
+				if(maxChildPid < clone_child)
+					maxChildPid = clone_child;
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
-				printf("### PTRACE_EVENT_VLONE %d\n", new_child);  
+				printf("### PTRACE_EVENT_VFORK %d\n", new_child);  
+				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
+				printf("### PTRACE_EVENT_VFORK child %d\n", clone_child);  
+				if(maxChildPid < clone_child)
+					maxChildPid = clone_child;
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK_DONE<<8))) {
 				printf("### PTRACE_EVENT_VFORK_DONE %d\n", new_child);  
+				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
+				printf("### PTRACE_EVENT_VFORK_DONE child %d\n", clone_child);  
+				if(maxChildPid < clone_child)
+					maxChildPid = clone_child;
 			}
 			if (status >>8 == PTRACE_EVENT_FORK) {
 				printf("### PTRACE_EVENT_FORK %d\n", new_child);  
+				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
+				printf("### PTRACE_EVENT_FORK child %d\n", clone_child);  
+				if(maxChildPid < clone_child)
+					maxChildPid = clone_child;
 			}
+
 			if(WIFEXITED(status)) {
 				printf("### new_child %d exited\n", new_child);
 				if(new_child==-1)
@@ -545,7 +571,7 @@ pthread_mutex_lock(&pid_mutex);
 				if(new_child==g_child)
 					break;
 			}
-pthread_mutex_unlock(&pid_mutex);
+			pthread_mutex_unlock(&pid_mutex);
 		}
 	}
 
