@@ -32,6 +32,8 @@
 #include "proc_info.h"
 #include "addr_maps.h"
 #include "ptr_backtrace.h"
+#include "list.h"
+#include "hash.h"
 #ifdef __cplusplus 
     } 
 #endif 
@@ -86,8 +88,6 @@ const char *opt_debug_info_file;
 
 const char* demangle(const char* name)
 {
-	char buf[1024];
-	unsigned int size=1024;
 	int status;
 	char* res = abi::__cxa_demangle (name,
 			0,
@@ -107,12 +107,11 @@ long main_orig_opc = 0;
 #define MAIN_ADDRESS  main_addr
 void set_breakpoint(pid_t child)
 {
-    int status;
     long orig = ptrace(PTRACE_PEEKTEXT, child, MAIN_ADDRESS, NULL);
     long trap;
 
     trap = TRAPINT;
-    printf("[+] Add breakpoint on 0x%lx, orig_opc=%#x \n", MAIN_ADDRESS, orig);
+    printf("[+] Add breakpoint on 0x%lx, orig_opc=%#lx \n", MAIN_ADDRESS, orig);
 
     main_orig_opc = orig;
     ptrace(PTRACE_POKETEXT, child, MAIN_ADDRESS, trap);
@@ -122,7 +121,6 @@ void set_breakpoint(pid_t child)
 
 void remove_breakpoint(pid_t child)
 {
-    int status;
     printf("[-] Removing breakpoint from 0x%lx\n", MAIN_ADDRESS);
     ptrace(PTRACE_POKETEXT, child, MAIN_ADDRESS, main_orig_opc);
 }
@@ -324,7 +322,7 @@ static void dump_regs(struct user const *regs, FILE *outfp)
     fprintf(outfp, "\n");
 }
 
-static void do_backtrace(pid_t child) {
+static void do_backtrace(pid_t child, int displayStackFrame) {
 
 	ui = (UPT_info*)_UPT_create(child);
 	if (!ui) {
@@ -346,7 +344,8 @@ static void do_backtrace(pid_t child) {
 		}
 	}
 
-	printf("\n### backtrace start ###\n");
+	if(displayStackFrame==1)
+		printf("### backtrace start ###\n");
 	do {
 		unw_word_t  offset, pc;
 		char        fname[64];
@@ -354,14 +353,13 @@ static void do_backtrace(pid_t child) {
 		unw_get_reg(&c, UNW_REG_IP, &pc);
 		fname[0] = '\0';
 		(void) unw_get_proc_name(&c, fname, sizeof(fname), &offset);
-		printf("%p : (%s+0x%x) [%p]\n", (void *)pc,
-				fname,
-				(int) offset,
-				(void *) pc);
+		if(displayStackFrame==1)
+			printf("%p : (%s+0x%x)\n", (void *)pc, fname, (int) offset);
 		//demangle(fname);
 		backTaceLevel++;
-	} while ((unw_step(&c) > 0) && (backTaceLevel < 5));
-	printf("### backtrace end ###\n\n");
+	} while ((unw_step(&c) > 0) && (backTaceLevel < 1));
+	if(displayStackFrame==1)
+		printf("### backtrace end ###\n\n");
 
 	_UPT_destroy(ui);
 }
@@ -411,6 +409,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 	if (!as) {
 		printf("unw_create_addr_space failed");
 	}
+	unw_set_caching_policy(as, UNW_CACHE_GLOBAL);
 
 	if (!g_child) {
 
@@ -478,12 +477,13 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							//dump_regs(&regs, stdout);
 							g_entryCnt--;
 							HASH_DEL(brptab, brp);
-							//do_backtrace(new_child);
 
 							/* -- at function return */
 							//printf("### function return: RA:%#x, g_entryCnt=%d\n", brp->return_addr, g_entryCnt);
 							clearbreakpoint(new_child, brp->return_addr, brp->return_opc);
 							bp = breakpoint_by_entry( brp->entry_addr);
+							//printf("## caller:%s, RA:%#lx\n", bp->name, brp->return_addr);
+							do_backtrace(new_child, 0);
 							if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
 								printf("\n== Not enough memory.\n");
 								break;
@@ -507,6 +507,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 				if((g_readelf == 0) && (new_child == g_child))
 				{
 					printf("### pid:%d, load symbol table, sig:%d\n", new_child, WSTOPSIG(status));
+
 					addr_maps_build(g_child);
 					ptr_maps_build(g_child);
 					symtab_build(g_child);
@@ -521,7 +522,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					for(i=g_child;i<=maxChildPid;i++)
                     {
 						printf("### [SIGSEGV] pid: %d, stop signal: %d\n", new_child, WSTOPSIG(status));  
-                    	do_backtrace(i);
+                    	do_backtrace(i, 0);
                     }
 					dump_regs(&regs, stdout);
                     break;

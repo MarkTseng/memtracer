@@ -15,7 +15,7 @@
 
 static inline uint32_t hash_slot(void *key, int len)
 {
-	uint32_t *p = key;
+	uint32_t *p = (uint32_t *)key;
 	uint32_t n = 0;
 	int i;
 	for (i = 0; i < len / sizeof(uint32_t); i++) {
