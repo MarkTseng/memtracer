@@ -17,7 +17,7 @@
 #include "ptrace_utils.h"
 #include "symtab.h"
 #include "minigdb.h"
-#define MAX_BREAKPINT_NUM (4)
+#define MAX_BREAKPINT_NUM (8)
 struct breakpoint_s g_breakpoints[MAX_BREAKPINT_NUM];
 
 static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
@@ -26,6 +26,35 @@ static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
 
 	return 0;
 }
+
+static int bph_new(uintptr_t pointer, uintptr_t size, uintptr_t none)
+{
+	//log_debug("-- new size:%ld ret:%lx\n", size, pointer);
+
+	return 0;
+}
+
+static int bph_newa(uintptr_t pointer, uintptr_t size, uintptr_t none)
+{
+	//log_debug("-- newa size:%ld ret:%lx\n", size, pointer);
+
+	return 0;
+}
+
+static int bph_delete(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
+{
+	//log_debug("-- delete point:%lx\n", pointer);
+
+	return 0;
+}
+
+static int bph_deletea(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
+{
+	//log_debug("-- deletea point:%lx\n", pointer);
+
+	return 0;
+}
+
 
 static int bph_free(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
@@ -74,6 +103,10 @@ void breakpoint_init(pid_t pid)
 	do_breakpoint_init(pid, &g_breakpoints[1], "free", bph_free);
 	do_breakpoint_init(pid, &g_breakpoints[2], "realloc", bph_realloc);
 	do_breakpoint_init(pid, &g_breakpoints[3], "calloc", bph_calloc);
+	do_breakpoint_init(pid, &g_breakpoints[4], "_Znwj", bph_new);
+	do_breakpoint_init(pid, &g_breakpoints[5], "_Znaj", bph_newa);
+	do_breakpoint_init(pid, &g_breakpoints[6], "_ZdlPv", bph_delete);
+	do_breakpoint_init(pid, &g_breakpoints[7], "_ZdaPv", bph_deletea);
 }
 
 void breakpoint_cleanup(pid_t pid)

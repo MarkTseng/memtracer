@@ -483,7 +483,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							clearbreakpoint(new_child, brp->return_addr, brp->return_opc);
 							bp = breakpoint_by_entry( brp->entry_addr);
 							//printf("## caller:%s, RA:%#lx\n", bp->name, brp->return_addr);
-							do_backtrace(new_child, 0);
+							//do_backtrace(new_child, 0);
 							if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
 								printf("\n== Not enough memory.\n");
 								break;
