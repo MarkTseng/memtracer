@@ -188,7 +188,6 @@ unsigned int setbreakpoint(pid_t exe, unsigned long breakaddr)
 
 	if (thumb) {
 		/* thumb */
-        //printf("thumb unknow inst\n");
 
 		if (addr & 0x2) {
 			/* odd half */
@@ -209,7 +208,6 @@ unsigned int setbreakpoint(pid_t exe, unsigned long breakaddr)
 	} else {
 		/* arm or unsure */
 
-        //printf("arm unknow inst\n");
 		/* check if breakpoint already set */
 		if (isintbreakpoint(origdata, 0)) {
 			return origdata;
@@ -258,7 +256,6 @@ void clearbreakpoint(pid_t exe, unsigned long breakaddr, unsigned int origint)
 
 		if (addr & 0x2) {
 			/* odd half */
-        //printf("thumb unknow inst\n");
 
 			/* check if breakpoint is set */
 			if (!isintbreakpoint(origdata, breakaddr & 0x3)) {
@@ -277,7 +274,6 @@ void clearbreakpoint(pid_t exe, unsigned long breakaddr, unsigned int origint)
 
 	} else {
 		/* arm or unsure */
-        //printf("arm unknow inst\n");
 
 		/* check if breakpoint is set */
 		if (!isintbreakpoint(origdata, 0)) {
@@ -385,13 +381,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 	unw_set_caching_policy(as, UNW_CACHE_GLOBAL);
 
 	if (!g_child) {
-
 		ptrace(PTRACE_TRACEME, g_child,0,0);
-		execve(path,
-				argv, envp);
-
+		execve(path, argv, envp);
 		return 0;
-
 	} else {
 		g_mainPid = getpid();
         printf("g_child: %d\n", g_child);
@@ -402,7 +394,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 		new_child = waitpid(-1, &status, __WALL);
 		if (WIFSTOPPED(status)) {
 			printf("### pid: %d, stop signal: %d\n", new_child, WSTOPSIG(status));  
-			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC);
+			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT);
             /* breakpoint in main */
             set_breakpoint(g_child);
 		}
@@ -410,7 +402,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
         /* trace pid */
 		while(1) {
             new_child = waitpid(-1, &status, __WALL);
-			pthread_mutex_lock(&pid_mutex);
+			//pthread_mutex_lock(&pid_mutex);
             memset(&regs, 0, sizeof(regs));
             ptrace(PTRACE_GETREGS, new_child, NULL, &regs);
             //dump_regs(&regs, stdout);
@@ -474,13 +466,13 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 				}
 				if(WSTOPSIG(status)== SIGINT)
 				{
-					ptrace(PTRACE_CONT,g_child, NULL, SIGINT);
-					break;
+					ptrace(PTRACE_CONT, new_child, NULL, SIGINT);
+					ptrace(PTRACE_KILL, new_child,0,0);
+					printf("### kill pid:%d, sig:%d\n", new_child, WSTOPSIG(status));
                 }
 				if((g_readelf == 0) && (new_child == g_child))
 				{
 					printf("### pid:%d, load symbol table, sig:%d\n", new_child, WSTOPSIG(status));
-
 					addr_maps_build(g_child);
 					ptr_maps_build(g_child);
 					symtab_build(g_child);
@@ -541,11 +533,15 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			if(WIFEXITED(status)) {
 				printf("### new_child %d exited\n", new_child);
 				if(new_child==-1)
+				{
 					break;
+				}
 				if(new_child==g_child)
+				{
 					break;
+				}
 			}
-			pthread_mutex_unlock(&pid_mutex);
+			//pthread_mutex_unlock(&pid_mutex);
 		}
 	}
 
