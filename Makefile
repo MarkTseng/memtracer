@@ -18,8 +18,8 @@ OBJS = breakpoint.o debug_file.o debug_line.o ptr_backtrace.o callstack.o memblo
 all: $(TARGET) $(TARGET2) $(TARGET3) 
 
 $(TARGET) : $(OBJS) memtrace.c
-	 arm-linux-gnueabihf-g++ -g -c memtrace.c $(CFLAGS)
-	 arm-linux-gnueabihf-g++ -g -o memtrace memtrace.o $(OBJS) $(LDLIBS)
+	 $(CC) -g -c memtrace.c $(CFLAGS)
+	 $(CC) -g -o memtrace memtrace.o $(OBJS) $(LDLIBS)
 	 cp $(TARGET) ~/nfs/ && sync
 
 $(TARGET2) : test.o

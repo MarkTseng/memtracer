@@ -1,4 +1,3 @@
-#include <cxxabi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -84,24 +83,6 @@ pid_t g_current_thread;
 int opt_backtrace_limit = BACKTRACE_MAX;
 const char *opt_debug_info_file;
 
-
-
-const char* demangle(const char* name)
-{
-	int status;
-	char* res = abi::__cxa_demangle (name,
-			0,
-			0,
-			&status);
-    if(res)
-        printf("fun name:%s\n", res);
-    else
-        printf("no demangle fun name:%s\n", name);
-	return res;
-}
-#ifdef __cplusplus 
-	extern "C" { 
-#endif 
 
 long main_orig_opc = 0;
 #define MAIN_ADDRESS  main_addr
@@ -324,7 +305,7 @@ static void dump_regs(struct user const *regs, FILE *outfp)
 
 static void do_backtrace(pid_t child, int displayStackFrame) {
 
-	ui = (UPT_info*)_UPT_create(child);
+	ui = _UPT_create(child);
 	if (!ui) {
 		printf("_UPT_create failed");
 	}
@@ -333,15 +314,7 @@ static void do_backtrace(pid_t child, int displayStackFrame) {
 	int backTaceLevel = 0;
 	int rc = unw_init_remote(&c, as, ui);
 	if (rc != 0) {
-		if (rc == UNW_EINVAL) {
-			printf("unw_init_remote: UNW_EINVAL");
-		} else if (rc == UNW_EUNSPEC) {
-			printf("unw_init_remote: UNW_EUNSPEC");
-		} else if (rc == UNW_EBADREG) {
-			printf("unw_init_remote: UNW_EBADREG");
-		} else {
-			printf("unw_init_remote: UNKNOWN");
-		}
+		printf("unw_init_remote: %s\n", unw_strerror(rc));
 	}
 
 	if(displayStackFrame==1)
@@ -357,7 +330,7 @@ static void do_backtrace(pid_t child, int displayStackFrame) {
 			printf("%p : (%s+0x%x)\n", (void *)pc, fname, (int) offset);
 		//demangle(fname);
 		backTaceLevel++;
-	} while ((unw_step(&c) > 0) && (backTaceLevel < 1));
+	} while ((unw_step(&c) > 0) && (backTaceLevel < 5));
 	if(displayStackFrame==1)
 		printf("### backtrace end ###\n\n");
 
@@ -439,7 +412,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
             new_child = waitpid(-1, &status, __WALL);
 			pthread_mutex_lock(&pid_mutex);
             memset(&regs, 0, sizeof(regs));
-            ptrace((__ptrace_request)PTRACE_GETREGS, new_child, NULL, &regs);
+            ptrace(PTRACE_GETREGS, new_child, NULL, &regs);
             //dump_regs(&regs, stdout);
 
             //printf("##[wait] status:%#x , sig:%d, pid:%d \n", status, WSTOPSIG(status), new_child);
@@ -483,7 +456,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							clearbreakpoint(new_child, brp->return_addr, brp->return_opc);
 							bp = breakpoint_by_entry( brp->entry_addr);
 							//printf("## caller:%s, RA:%#lx\n", bp->name, brp->return_addr);
-							//do_backtrace(new_child, 0);
+							do_backtrace(new_child, 0);
 							if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
 								printf("\n== Not enough memory.\n");
 								break;
@@ -582,6 +555,3 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 	printf("memtrace exit\n");
 	return 0;
 }
-#ifdef __cplusplus 
-} 
-#endif
