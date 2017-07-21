@@ -486,7 +486,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					int i;
 					for(i=g_child;i<=maxChildPid;i++)
                     {
-						printf("### [SIGSEGV] pid: %d, stop signal: %d\n", new_child, WSTOPSIG(status));  
+						printf("### [SIGSEGV] pid: %d, stop signal: %d\n", i, WSTOPSIG(status));  
                     	do_backtrace(i, 0);
                     }
 					dump_regs(&regs, stdout);
