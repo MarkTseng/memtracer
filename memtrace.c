@@ -335,11 +335,9 @@ static void do_backtrace(pid_t child, int displayStackFrame) {
 
 static void signal_handler(int signo)
 {
-	//printf("SIGINT trigger\n");
+	printf("send SIGINT signal\n");
 	//ptrace(PTRACE_KILL, g_child,0,0);
-	//kill(g_child, SIGINT);
-	//kill(g_mainPid, SIGKILL);
-	//unw_destroy_addr_space(as);
+	kill(g_child, SIGINT);
 }
 
 int main(int argc __attribute__((unused)), char **argv, char **envp) 
@@ -408,6 +406,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
             //dump_regs(&regs, stdout);
 
             //printf("##[wait] status:%#x , sig:%d, pid:%d \n", status, WSTOPSIG(status), new_child);
+			if(new_child == -1)
+				break;
+
             if (WIFSTOPPED(status)) {
                 //printf("##[WIFSTOPPED] status:%#x , sig:%d, pid:%d \n", status, WSTOPSIG(status), new_child);
                 if(WSTOPSIG(status)== SIGILL)
@@ -448,7 +449,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							clearbreakpoint(new_child, brp->return_addr, brp->return_opc);
 							bp = breakpoint_by_entry( brp->entry_addr);
 							//printf("## caller:%s, RA:%#lx\n", bp->name, brp->return_addr);
-							do_backtrace(new_child, 0);
+							//do_backtrace(new_child, 1);
+							//callstack_print(callstack_current());
 							if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
 								printf("\n== Not enough memory.\n");
 								break;
@@ -467,7 +469,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 				if(WSTOPSIG(status)== SIGINT)
 				{
 					ptrace(PTRACE_CONT, new_child, NULL, SIGINT);
-					ptrace(PTRACE_KILL, new_child,0,0);
+					//ptrace(PTRACE_KILL, new_child,0,0);
 					printf("### kill pid:%d, sig:%d\n", new_child, WSTOPSIG(status));
                 }
 				if((g_readelf == 0) && (new_child == g_child))
