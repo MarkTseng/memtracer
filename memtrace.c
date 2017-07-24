@@ -62,6 +62,7 @@ uintptr_t arg1 = 0, arg2 = 0;
 unsigned int breaktrap = 0;
 pthread_mutex_t pid_mutex;
 int g_entryCnt = 0;
+const int long_size = sizeof(long);
 
 typedef struct{
     long return_addr; 
@@ -83,6 +84,31 @@ pid_t g_current_thread;
 int opt_backtrace_limit = BACKTRACE_MAX;
 const char *opt_debug_info_file;
 
+void getdata(pid_t child, long addr, char *str, int len)
+{   char *laddr;
+    int i, j;
+    union u {
+            long val;
+            char chars[long_size];
+    }data;
+    
+    i = 0;
+    j = len / long_size;
+    laddr = str;
+    while(i < j) {
+        data.val = ptrace(PTRACE_PEEKDATA, child, addr + i * 4, NULL);
+        memcpy(laddr, data.chars, long_size);
+        ++i;
+        laddr += long_size;
+    }
+    
+    j = len % long_size;
+    if(j != 0) {
+        data.val = ptrace(PTRACE_PEEKDATA, child, addr + i * 4, NULL);
+        memcpy(laddr, data.chars, j);
+    }
+    str[len] = '\0';       
+}
 
 long main_orig_opc = 0;
 #define MAIN_ADDRESS  main_addr
@@ -434,6 +460,13 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						/* save arguments */
 						arg1 = regs.regs.ARM_r0;
 						arg2 = regs.regs.ARM_r1;
+						if(strcmp("dlopen", bp->name) == 0)
+						{
+							char dlname[128];
+							getdata(new_child, arg1, dlname, 32);
+							printf("#### call dlopen: %s \n", dlname);
+							
+						}
 						//dump_regs(&regs, stdout);
 					} else {
 						//printf("##[SIGILL] status:%#x , sig:%d, pid:%d \n", status, WSTOPSIG(status), new_child);

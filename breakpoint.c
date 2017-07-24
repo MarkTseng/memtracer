@@ -17,7 +17,7 @@
 #include "ptrace_utils.h"
 #include "symtab.h"
 #include "minigdb.h"
-#define MAX_BREAKPINT_NUM (8)
+#define MAX_BREAKPINT_NUM (9)
 struct breakpoint_s g_breakpoints[MAX_BREAKPINT_NUM];
 
 static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
@@ -55,6 +55,12 @@ static int bph_deletea(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 	return 0;
 }
 
+static int bph_dlopen(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
+{
+	log_debug("-- dlopen :%lx, %#x, %#x\n", none1, pointer, none2);
+
+	return 0;
+}
 
 static int bph_free(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
@@ -86,7 +92,6 @@ static void do_breakpoint_init(pid_t pid, struct breakpoint_s *bp,
 	bp->entry_address = symtab_by_name(name);
 	if (bp->entry_address == 0) {
 		fprintf(stderr, "not found api: %s\n", name);
-		exit(3);
 	}
 
 	/* read original code */
@@ -107,6 +112,7 @@ void breakpoint_init(pid_t pid)
 	do_breakpoint_init(pid, &g_breakpoints[5], "_Znaj", bph_newa);
 	do_breakpoint_init(pid, &g_breakpoints[6], "_ZdlPv", bph_delete);
 	do_breakpoint_init(pid, &g_breakpoints[7], "_ZdaPv", bph_deletea);
+	do_breakpoint_init(pid, &g_breakpoints[8], "dlopen", bph_dlopen);
 }
 
 void breakpoint_cleanup(pid_t pid)
