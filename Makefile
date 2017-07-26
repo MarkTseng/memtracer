@@ -44,9 +44,6 @@ breakpoint.o: breakpoint.c hash.h list.h ptr_backtrace.h \
 debug_file.o: debug_file.c debug_file.h minigdb.h
 debug_line.o: debug_line.c debug_line.h array.h minigdb.h proc_info.h \
  debug_file.h /usr/include/elfutils/libdw.h
-minigdb.o: minigdb.c \
- hash.h list.h ptr_backtrace.h symtab.h debug_line.h proc_info.h \
- addr_maps.h minigdb.h
 ptr_backtrace.o: ptr_backtrace.c ptr_backtrace.h proc_info.h list.h \
  hash.h minigdb.h ptrace_utils.h
 callstack.o: callstack.c hash.h list.h array.h symtab.h callstack.h \
