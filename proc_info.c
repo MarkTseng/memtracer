@@ -51,7 +51,6 @@ const char *proc_maps(pid_t pid, size_t *start, size_t *end, int *exe_self)
 		if (ret == 8 && perms[2] == 'x' && ret_path[0] == '/') {
 			if (exe_self != NULL) {
 				*exe_self = (strcmp(ret_path, exe_name) == 0);
-                //printf("[%s][%d] %s \n", __func__, __LINE__, ret_path);
 			}
 			return ret_path;
 		}
@@ -61,6 +60,44 @@ const char *proc_maps(pid_t pid, size_t *start, size_t *end, int *exe_self)
 	filp = NULL;
 	return NULL;
 }
+
+const char *proc_maps_by_name(pid_t pid, char *libPath,size_t *start, size_t *end)
+{
+	static FILE *filp = NULL;
+	static char ret_path[1024];
+
+	/* first, init */
+	if (filp == NULL) {
+		char pname[100];
+		sprintf(pname, "/proc/%d/maps", pid);
+		filp = fopen(pname, "r");
+		if (filp == NULL) {
+			perror("Error in open /proc/pid/maps");
+			exit(3);
+		}
+	}
+
+	/* walk through */
+	char line[1024];
+	char perms[5];
+	char deleted[100];
+	int ia, ib, ic, id;
+	while (fgets(line, sizeof(line), filp) != NULL) {
+		int ret = sscanf(line, "%lx-%lx %s %x %x:%x %d %s %s",
+				start, end, perms, &ia, &ib, &ic, &id, ret_path, deleted);
+        if(strstr(ret_path, libPath) != NULL)
+        {
+		    if (ret == 8 && perms[2] == 'x' && ret_path[0] == '/') {
+			    return ret_path;
+		    }
+        }
+	}
+
+	fclose(filp);
+	filp = NULL;
+	return NULL;
+}
+
 
 pid_t proc_tasks(pid_t pid)
 {

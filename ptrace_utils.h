@@ -36,7 +36,6 @@ static inline uintptr_t ptrace_get_data(pid_t pid, uintptr_t address)
 }
 static inline void ptrace_set_data(pid_t pid, uintptr_t address, uintptr_t data)
 {
-    printf("### set breakpoint: address:%#x, data:%#x\n", address, data);
 	ptrace(PTRACE_POKETEXT, pid, address, data);
 }
 static inline void ptrace_set_int3(pid_t pid, uintptr_t address, uintptr_t code)

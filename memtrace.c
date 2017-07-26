@@ -48,7 +48,6 @@
 #define TRAPINT (0xe7ffffff)
 #define TRAPHALF (0xdeff)
 
-
 // global variable
 pid_t g_child;
 pid_t g_mainPid;
@@ -63,6 +62,7 @@ unsigned int breaktrap = 0;
 pthread_mutex_t pid_mutex;
 int g_entryCnt = 0;
 const int long_size = sizeof(long);
+char dlname[128];
 
 typedef struct{
     long return_addr; 
@@ -390,7 +390,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
     //printf("elf symbol:%d\n", symtot);
     //display_symbols(symbols, symtot);
     main_addr = symaddr(symbols, symtot, "main");
-    printf("main addr = %#lx\n", main_addr);
+    printf("### main addr = %#lx\n", main_addr);
 
 	signal(SIGINT, signal_handler);
 
@@ -401,6 +401,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 	as = unw_create_addr_space(&_UPT_accessors, 0);
 	if (!as) {
 		printf("unw_create_addr_space failed");
+		exit(-1);
 	}
 	unw_set_caching_policy(as, UNW_CACHE_GLOBAL);
 
@@ -410,8 +411,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 		return 0;
 	} else {
 		g_mainPid = getpid();
-        printf("g_child: %d\n", g_child);
-        printf("g_mainPid: %d\n", g_mainPid);
+        printf("### g_child: %d\n", g_child);
+        printf("### g_mainPid: %d\n", g_mainPid);
 			
 		int status;
       
@@ -437,7 +438,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
             if (WIFSTOPPED(status)) {
                 //printf("##[WIFSTOPPED] status:%#x , sig:%d, pid:%d \n", status, WSTOPSIG(status), new_child);
-                if(WSTOPSIG(status)== SIGILL)
+				if(WSTOPSIG(status)== SIGILL)
                 {  
 					if ((bp = breakpoint_by_entry(regs.regs.ARM_pc)) != NULL)
 					{
@@ -462,10 +463,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						arg2 = regs.regs.ARM_r1;
 						if(strcmp("dlopen", bp->name) == 0)
 						{
-							char dlname[128];
+							memset(dlname,0,sizeof(dlname));
 							getdata(new_child, arg1, dlname, 32);
 							printf("#### call dlopen: %s \n", dlname);
-							
 						}
 						//dump_regs(&regs, stdout);
 					} else {
@@ -484,9 +484,26 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							//printf("## caller:%s, RA:%#lx\n", bp->name, brp->return_addr);
 							//do_backtrace(new_child, 1);
 							//callstack_print(callstack_current());
-							if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
-								printf("\n== Not enough memory.\n");
-								break;
+							if(strcmp("dlopen", bp->name) == 0)
+							{
+								int i;
+								const char *path = NULL;
+								size_t start, end;
+								for(i=g_child;i<=maxChildPid;i++)
+								{
+									path = proc_maps_by_name(new_child, dlname,&start, &end);
+									if(path != NULL)
+									{	
+										//printf("#### pid:%d, solib path:%s, start:%#x, end:%#x\n", i,path,start,end);
+										ptr_maps_build_file(path, start, end);
+										break;
+									}
+								}
+							}else{
+								if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
+									printf("\n== Not enough memory.\n");
+									break;
+								}
 							}
 							/*restore instruction(s)*/
 							//printf("### recovery breakpoint: entry_address:%#x \n\n", brp->entry_addr);
@@ -507,7 +524,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                 }
 				if((g_readelf == 0) && (new_child == g_child))
 				{
-					printf("### pid:%d, load symbol table, sig:%d\n", new_child, WSTOPSIG(status));
+					//printf("### pid:%d, load symbol table, sig:%d\n", new_child, WSTOPSIG(status));
 					addr_maps_build(g_child);
 					ptr_maps_build(g_child);
 					symtab_build(g_child);
@@ -529,44 +546,40 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                 }
 				ptrace(PTRACE_CONT,new_child, NULL, NULL);
 			}
+
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
-				printf("### PTRACE_EVENT_EXEC %d, \n", new_child);  
 				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-				printf("### PTRACE_EVENT_EXEC child %d\n", clone_child);  
+				//printf("### PTRACE_EVENT_EXEC child %d\n", clone_child);  
 				if(maxChildPid < clone_child)
 					maxChildPid = clone_child;
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8))) {
-				printf("### PTRACE_EVENT_CLONE %d\n", new_child);  
 				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-				printf("### PTRACE_EVENT_CLONE child %d\n", clone_child);  
+				//printf("### PTRACE_EVENT_CLONE child %d\n", clone_child);  
 				if(maxChildPid < clone_child)
 					maxChildPid = clone_child;
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
-				printf("### PTRACE_EVENT_VFORK %d\n", new_child);  
 				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-				printf("### PTRACE_EVENT_VFORK child %d\n", clone_child);  
+				//printf("### PTRACE_EVENT_VFORK child %d\n", clone_child);  
 				if(maxChildPid < clone_child)
 					maxChildPid = clone_child;
 			}
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK_DONE<<8))) {
-				printf("### PTRACE_EVENT_VFORK_DONE %d\n", new_child);  
 				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-				printf("### PTRACE_EVENT_VFORK_DONE child %d\n", clone_child);  
+				//printf("### PTRACE_EVENT_VFORK_DONE child %d\n", clone_child);  
 				if(maxChildPid < clone_child)
 					maxChildPid = clone_child;
 			}
 			if (status >>8 == PTRACE_EVENT_FORK) {
-				printf("### PTRACE_EVENT_FORK %d\n", new_child);  
 				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-				printf("### PTRACE_EVENT_FORK child %d\n", clone_child);  
+				//printf("### PTRACE_EVENT_FORK child %d\n", clone_child);  
 				if(maxChildPid < clone_child)
 					maxChildPid = clone_child;
 			}
 
 			if(WIFEXITED(status)) {
-				printf("### new_child %d exited\n", new_child);
+				printf("### pid %d exited\n", new_child);
 				if(new_child==-1)
 				{
 					break;

@@ -31,8 +31,17 @@ struct map_section_s {
     char mapName[128];
 };
 
-static void ptr_maps_build_file(const char *path, size_t start, size_t end)
+void ptr_maps_build_file(const char *path, size_t start, size_t end)
 {
+	struct list_head *p;
+	struct map_section_s *qms;
+	list_for_each(p, &g_map_sections) {
+		qms = list_entry(p, struct map_section_s, list_node);
+		if (strcmp(qms->mapName, path)==0) {
+            printf("##[%s] map: %s exlist\n", __func__, qms->mapName);
+            return;
+		}
+	}
 	/* create map-section */
 	struct map_section_s *ms = malloc(sizeof(struct map_section_s) + end - start);
 
@@ -47,7 +56,6 @@ static void ptr_maps_build_file(const char *path, size_t start, size_t end)
 		printf("Warning: error in read map of %s: %s\n", path, strerror(errno));
 		return;
 	}
-    printf("[%s](%d) open: %s, len:%d, start:%#x, end:%#x \n", __func__, __LINE__, path, rlen, start, end);
 
 	/* read OK */
 	close(fd);
@@ -55,7 +63,7 @@ static void ptr_maps_build_file(const char *path, size_t start, size_t end)
 	ms->start = start;
 	ms->end = start + rlen;
     strcpy(ms->mapName, path);
-    printf("ms->mapName:%s\n", ms->mapName);
+    printf("##[%s] add mapName:%s\n", __func__, ms->mapName);
 	list_add_tail(&ms->list_node, &g_map_sections);
 }
 

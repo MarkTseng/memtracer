@@ -57,7 +57,7 @@ static int bph_deletea(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 
 static int bph_dlopen(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	log_debug("-- dlopen :%lx, %#x, %#x\n", none1, pointer, none2);
+	//log_debug("-- dlopen ret:%#x, p1:%#x, p2:%#x\n", none1, pointer, none2);
 
 	return 0;
 }
