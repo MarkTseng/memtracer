@@ -28,6 +28,7 @@ struct map_section_s {
 	struct list_head	list_node;
 	uintptr_t		start, end;
 	unw_word_t		data[0];
+    char mapName[128];
 };
 
 static void ptr_maps_build_file(const char *path, size_t start, size_t end)
@@ -41,18 +42,20 @@ static void ptr_maps_build_file(const char *path, size_t start, size_t end)
 		printf("Warning: error in open map of %s: %s\n", path, strerror(errno));
 		return;
 	}
-    //printf("[%s](%d) open: %s\n", __func__, __LINE__, path);
 	ssize_t rlen = read(fd, ms->data, end - start);
 	if (rlen < 0) {
 		printf("Warning: error in read map of %s: %s\n", path, strerror(errno));
 		return;
 	}
+    printf("[%s](%d) open: %s, len:%d, start:%#x, end:%#x \n", __func__, __LINE__, path, rlen, start, end);
 
 	/* read OK */
 	close(fd);
 
 	ms->start = start;
 	ms->end = start + rlen;
+    strcpy(ms->mapName, path);
+    printf("ms->mapName:%s\n", ms->mapName);
 	list_add_tail(&ms->list_node, &g_map_sections);
 }
 

@@ -17,7 +17,7 @@
 #include "ptrace_utils.h"
 #include "symtab.h"
 #include "minigdb.h"
-#define MAX_BREAKPINT_NUM (9)
+#define MAX_BREAKPINT_NUM (11)
 struct breakpoint_s g_breakpoints[MAX_BREAKPINT_NUM];
 
 static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
@@ -83,6 +83,19 @@ static int bph_calloc(uintptr_t pointer, uintptr_t nmemb, uintptr_t size)
 	return 0;
 }
 
+static int bph_mmap(uintptr_t ret_map_addr, uintptr_t none1, uintptr_t length)
+{
+	log_debug("-- mmap addr:%#x, length:%#x\n", ret_map_addr, length);
+
+	return 0;
+}
+
+static int bph_munmap(uintptr_t none1, uintptr_t unmap_addr, uintptr_t length)
+{
+	log_debug("-- munmap addr:%#x, length:%#x\n", unmap_addr, length);
+
+	return 0;
+}
 
 static void do_breakpoint_init(pid_t pid, struct breakpoint_s *bp,
 		const char *name, bp_handler_f handler)
@@ -113,6 +126,8 @@ void breakpoint_init(pid_t pid)
 	do_breakpoint_init(pid, &g_breakpoints[6], "_ZdlPv", bph_delete);
 	do_breakpoint_init(pid, &g_breakpoints[7], "_ZdaPv", bph_deletea);
 	do_breakpoint_init(pid, &g_breakpoints[8], "dlopen", bph_dlopen);
+	do_breakpoint_init(pid, &g_breakpoints[9], "mmap", bph_mmap);
+	do_breakpoint_init(pid, &g_breakpoints[10], "munmap", bph_munmap);
 }
 
 void breakpoint_cleanup(pid_t pid)

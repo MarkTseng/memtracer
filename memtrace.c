@@ -522,7 +522,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					for(i=g_child;i<=maxChildPid;i++)
                     {
 						printf("### [SIGSEGV] pid: %d, stop signal: %d\n", i, WSTOPSIG(status));  
-                    	do_backtrace(i, 0);
+                    	do_backtrace(i, 1);
                     }
 					dump_regs(&regs, stdout);
                     break;
