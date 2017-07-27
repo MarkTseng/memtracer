@@ -53,7 +53,6 @@ struct breakpoint_s *bp = NULL;
 uintptr_t return_address = 0, return_code = 0;
 uintptr_t arg1 = 0, arg2 = 0;
 unsigned int breaktrap = 0;
-pthread_mutex_t pid_mutex;
 int g_entryCnt = 0;
 const int long_size = sizeof(long);
 char dlname[128];
@@ -85,6 +84,25 @@ uintptr_t g_current_entry;
 pid_t g_current_thread;
 int opt_backtrace_limit = BACKTRACE_MAX;
 const char *opt_debug_info_file;
+
+void deleteAllList()
+{
+	btctSymbol *current_btct, *btct_tmp;
+	brpSymbol *current_brp, *brp_tmp;
+
+	// free backTraceCacheTable
+	HASH_ITER(hh, btctab, current_btct, btct_tmp) {
+		HASH_DEL(btctab, current_btct);  /* delete it (users advances to next) */
+		free(current_btct->backtrace);
+		free(current_btct);             /* free it */
+	}
+
+	// free breakPointTable
+	HASH_ITER(hh, brptab, current_brp, brp_tmp) {
+		HASH_DEL(btctab, current_brp);  /* delete it (users advances to next) */
+		free(current_brp);             /* free it */
+	}
+}
 
 void getPidName(pid_t pid, char *name)
 {
@@ -398,7 +416,8 @@ static void do_backtrace(pid_t child, long pc,int displayStackFrame) {
 
 		// do cache
 		btc = (btctSymbol*)malloc(sizeof(btctSymbol));
-		btc->return_addr = pc;
+		if(pc!=0)
+			btc->return_addr = pc;
 		btc->backtrace = strdup(backTraceRec);
 		HASH_ADD_INT(btctab, return_addr, btc);
 
@@ -441,7 +460,6 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 	signal(SIGINT, signal_handler);
 
-	pthread_mutex_init(&pid_mutex,NULL);
 	g_child = fork();
 
     // setup libunwind
@@ -474,7 +492,6 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
         /* trace pid */
 		while(1) {
             new_child = waitpid(-1, &status, __WALL);
-			//pthread_mutex_lock(&pid_mutex);
             memset(&regs, 0, sizeof(regs));
             ptrace(PTRACE_GETREGS, new_child, NULL, &regs);
             //dump_regs(&regs, stdout);
@@ -590,8 +607,11 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					int i;
 					for(i=g_child;i<=maxChildPid;i++)
                     {
-						printf("### [SIGSEGV] pid: %d, stop signal: %d\n", i, WSTOPSIG(status));  
+						memset(pidName,0,sizeof(pidName));
+						getPidName(i, pidName);
+						printf("### [SIGSEGV] pid: %d %s, stop signal: %d\n", i, pidName, WSTOPSIG(status));  
                     	do_backtrace(i, 0, 1);
+
                     }
 					dump_regs(&regs, stdout);
                     break;
@@ -646,13 +666,12 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					break;
 				}
 			}
-			//pthread_mutex_unlock(&pid_mutex);
 		}
 	}
 
 	breakpoint_cleanup(g_child);
-	pthread_mutex_destroy(&pid_mutex);
 	unw_destroy_addr_space(as);
+	deleteAllList();
 	printf("memtrace exit\n");
 	return 0;
 }
