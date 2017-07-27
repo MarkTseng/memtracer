@@ -415,12 +415,13 @@ static void do_backtrace(pid_t child, long pc,int displayStackFrame) {
 			printf("### backtrace end ###\n\n");
 
 		// do cache
-		btc = (btctSymbol*)malloc(sizeof(btctSymbol));
 		if(pc!=0)
+		{
+			btc = (btctSymbol*)malloc(sizeof(btctSymbol));
 			btc->return_addr = pc;
-		btc->backtrace = strdup(backTraceRec);
-		HASH_ADD_INT(btctab, return_addr, btc);
-
+			btc->backtrace = strdup(backTraceRec);
+			HASH_ADD_INT(btctab, return_addr, btc);
+		}
 		_UPT_destroy(ui);
 	}
 }
