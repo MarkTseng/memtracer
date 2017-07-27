@@ -355,8 +355,11 @@ static void do_backtrace(pid_t child, long pc,int displayStackFrame) {
 	HASH_FIND_INT(btctab, &pc, btc);
 	if(btc)
 	{
-		//printf("[cache] RA:%#lx\n",btc->return_addr);
-		//printf("[cache] BT:%s\n",btc->backtrace);
+		if(displayStackFrame==1)
+		{
+			printf("[cache] RA:%#lx\n",btc->return_addr);
+			printf("[cache] BT:%s\n",btc->backtrace);
+		}
 		return;
 	}else{
 		ui = _UPT_create(child);
