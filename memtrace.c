@@ -22,9 +22,6 @@
 //uthash 
 #include "uthash.h"
 
-#ifdef __cplusplus 
-	extern "C" { 
-#endif 
 #include "breakpoint.h"
 #include "symtab.h"
 #include "debug_line.h"
@@ -33,9 +30,6 @@
 #include "ptr_backtrace.h"
 #include "list.h"
 #include "hash.h"
-#ifdef __cplusplus 
-    } 
-#endif 
 
 // define
 #define ERR -1
@@ -63,6 +57,7 @@ pthread_mutex_t pid_mutex;
 int g_entryCnt = 0;
 const int long_size = sizeof(long);
 char dlname[128];
+char pidName[32];
 
 typedef struct{
     long return_addr; 
@@ -77,12 +72,41 @@ struct symbol *symbols = NULL;
 int symtot = 0;
 unsigned long main_addr = 0;
 
+typedef struct{
+    long return_addr; 
+	char *backtrace;
+    UT_hash_handle hh; /*uthash handle*/
+}backTraceCacheTable, btctSymbol;
+backTraceCacheTable *btctab=NULL, *btc;
+
 // memleax for compile use
-#define BACKTRACE_MAX 50
+#define BACKTRACE_MAX (5)
 uintptr_t g_current_entry;
 pid_t g_current_thread;
 int opt_backtrace_limit = BACKTRACE_MAX;
 const char *opt_debug_info_file;
+
+void getPidName(pid_t pid, char *name)
+{
+	FILE *filp = NULL;
+	char pname[100];
+	unsigned long long int x  = 0;
+
+	/* first, init */
+	if (filp == NULL) {
+		sprintf(pname, "/proc/%d/stat", pid);
+		filp = fopen(pname, "r");
+		if (filp == NULL) {
+			perror("Error in open /proc/pid/stat");
+			return;
+		}
+
+	}
+
+	fscanf(filp, "%lld ", &x);
+	fscanf(filp, "%s ", name);
+	fclose(filp);
+}
 
 void getdata(pid_t child, long addr, char *str, int len)
 {   char *laddr;
@@ -325,38 +349,58 @@ static void dump_regs(struct user const *regs, FILE *outfp)
     fprintf(outfp, "\n");
 }
 
-static void do_backtrace(pid_t child, int displayStackFrame) {
+static void do_backtrace(pid_t child, long pc,int displayStackFrame) {
 
-	ui = _UPT_create(child);
-	if (!ui) {
-		printf("_UPT_create failed");
-	}
+	//printf("[%s] pc:%#lx\n",__func__, pc);
+	HASH_FIND_INT(btctab, &pc, btc);
+	if(btc)
+	{
+		//printf("[cache] RA:%#lx\n",btc->return_addr);
+		//printf("[cache] BT:%s\n",btc->backtrace);
+		return;
+	}else{
+		ui = _UPT_create(child);
+		if (!ui) {
+			printf("_UPT_create failed");
+		}
 
-	unw_cursor_t c;
-	int backTaceLevel = 0;
-	int rc = unw_init_remote(&c, as, ui);
-	if (rc != 0) {
-		printf("unw_init_remote: %s\n", unw_strerror(rc));
-	}
+		unw_cursor_t c;
+		int backTaceLevel = 0;
+		int rc = unw_init_remote(&c, as, ui);
+		if (rc != 0) {
+			printf("unw_init_remote: %s\n", unw_strerror(rc));
+		}
 
-	if(displayStackFrame==1)
-		printf("### backtrace start ###\n");
-	do {
-		unw_word_t  offset, pc;
-		char        fname[64];
-
-		unw_get_reg(&c, UNW_REG_IP, &pc);
-		fname[0] = '\0';
-		(void) unw_get_proc_name(&c, fname, sizeof(fname), &offset);
 		if(displayStackFrame==1)
-			printf("%p : (%s+0x%x)\n", (void *)pc, fname, (int) offset);
-		//demangle(fname);
-		backTaceLevel++;
-	} while ((unw_step(&c) > 0) && (backTaceLevel < 5));
-	if(displayStackFrame==1)
-		printf("### backtrace end ###\n\n");
+			printf("### backtrace start ###\n");
+		
+		char backTraceRec[256];
+		char *cur = backTraceRec, * const end = backTraceRec + sizeof(backTraceRec);
+		memset(backTraceRec,0,sizeof(backTraceRec));
+		do {
+			unw_word_t  offset, pc;
+			char fname[64];
+			unw_get_reg(&c, UNW_REG_IP, &pc);
+			fname[0] = '\0';
+			(void) unw_get_proc_name(&c, fname, sizeof(fname), &offset);
+			if(displayStackFrame==1)
+				printf("%p : (%s+0x%x)\n", (void *)pc, fname, (int) offset);
+			if (cur < end) {
+				cur += snprintf(cur, end-cur, "\n%p:(%s+0x%x)\n", (void *)pc, fname, (int) offset);
+			}
+			backTaceLevel++;
+		} while ((unw_step(&c) > 0) && (backTaceLevel < BACKTRACE_MAX));
+		if(displayStackFrame==1)
+			printf("### backtrace end ###\n\n");
 
-	_UPT_destroy(ui);
+		// do cache
+		btc = (btctSymbol*)malloc(sizeof(btctSymbol));
+		btc->return_addr = pc;
+		btc->backtrace = strdup(backTraceRec);
+		HASH_ADD_INT(btctab, return_addr, btc);
+
+		_UPT_destroy(ui);
+	}
 }
 
 static void signal_handler(int signo)
@@ -481,8 +525,13 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							//printf("### function return: RA:%#x, g_entryCnt=%d\n", brp->return_addr, g_entryCnt);
 							clearbreakpoint(new_child, brp->return_addr, brp->return_opc);
 							bp = breakpoint_by_entry( brp->entry_addr);
+
+							g_current_entry = brp->entry_addr;	
+							g_current_thread = new_child;
+
 							//printf("## caller:%s, RA:%#lx\n", bp->name, brp->return_addr);
-							//do_backtrace(new_child, 1);
+							
+							do_backtrace(new_child, brp->return_addr,0);
 							//callstack_print(callstack_current());
 							if(strcmp("dlopen", bp->name) == 0)
 							{
@@ -495,7 +544,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 									if(path != NULL)
 									{	
 										//printf("#### pid:%d, solib path:%s, start:%#x, end:%#x\n", i,path,start,end);
-										ptr_maps_build_file(path, start, end);
+										//ptr_maps_build_file(path, start, end);
 										break;
 									}
 								}
@@ -525,8 +574,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 				if((g_readelf == 0) && (new_child == g_child))
 				{
 					//printf("### pid:%d, load symbol table, sig:%d\n", new_child, WSTOPSIG(status));
-					addr_maps_build(g_child);
-					ptr_maps_build(g_child);
+					//addr_maps_build(g_child);
+					//ptr_maps_build(g_child);
 					symtab_build(g_child);
 					/* malloc .... breakpoint */
 					breakpoint_init(g_child);
@@ -539,7 +588,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					for(i=g_child;i<=maxChildPid;i++)
                     {
 						printf("### [SIGSEGV] pid: %d, stop signal: %d\n", i, WSTOPSIG(status));  
-                    	do_backtrace(i, 1);
+                    	do_backtrace(i, 0, 1);
                     }
 					dump_regs(&regs, stdout);
                     break;
@@ -559,6 +608,11 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 				if(maxChildPid < clone_child)
 					maxChildPid = clone_child;
 			}
+			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8))) {
+				memset(pidName,0,sizeof(pidName));
+				getPidName(new_child, pidName);
+				printf("### pid %d %s exit \n", new_child, pidName);
+			}	
 			if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
 				ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
 				//printf("### PTRACE_EVENT_VFORK child %d\n", clone_child);  
@@ -579,7 +633,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			}
 
 			if(WIFEXITED(status)) {
-				printf("### pid %d exited\n", new_child);
+				//printf("### pid %d exited\n", new_child);
 				if(new_child==-1)
 				{
 					break;
