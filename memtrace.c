@@ -98,7 +98,7 @@ void deleteAllList()
 
 	// free breakPointTable
 	HASH_ITER(hh, brptab, current_brp, brp_tmp) {
-		HASH_DEL(btctab, current_brp);  /* delete it (users advances to next) */
+		HASH_DEL(brptab, current_brp);  /* delete it (users advances to next) */
 		free(current_brp);             /* free it */
 	}
 }
@@ -480,9 +480,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 		g_mainPid = getpid();
         printf("g_child: %d", g_child);
         printf("g_mainPid: %d", g_mainPid);
-		param.sched_priority = sched_get_priority_max(SCHED_RR);
-		if( sched_setscheduler( 0, SCHED_RR, &param ) == -1 ) {
-			perror("no permission to get SCHED_RR");
+		param.sched_priority = sched_get_priority_max(SCHED_FIFO);
+		if( sched_setscheduler( 0, SCHED_FIFO, &param ) == -1 ) {
+			perror("no permission to get SCHED_FIFO");
 			exit(1);
 		}
 		new_child = waitpid(-1, &status, __WALL);
@@ -584,16 +584,14 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						}
 					}
 				}
-				if(WSTOPSIG(status)== SIGTRAP)
-				{
 
-				}
 				if(WSTOPSIG(status)== SIGINT)
 				{
 					ptrace(PTRACE_CONT, new_child, NULL, SIGINT);
 					//ptrace(PTRACE_KILL, new_child,0,0);
 					printf("kill pid:%d, sig:%d", new_child, WSTOPSIG(status));
                 }
+
 				if((g_readelf == 0) && (new_child == g_child))
 				{
 					//printf("pid:%d, load symbol table, sig:%d", new_child, WSTOPSIG(status));
@@ -605,6 +603,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					remove_breakpoint(g_child);
 					g_readelf = 1;
 				}
+
 				if(WSTOPSIG(status)== SIGSEGV)
                 {
 					int i;
@@ -634,23 +633,27 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					if(maxChildPid < clone_child)
 						maxChildPid = clone_child;
 				}
+
 				if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8))) {
 					memset(pidName,0,sizeof(pidName));
 					getPidName(new_child, pidName);
 					printf("pid %d %s exit", new_child, pidName);
 				}	
+
 				if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
 					ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
 					//printf("PTRACE_EVENT_VFORK child %d", clone_child);  
 					if(maxChildPid < clone_child)
 						maxChildPid = clone_child;
 				}
+
 				if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK_DONE<<8))) {
 					ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
 					//printf("PTRACE_EVENT_VFORK_DONE child %d", clone_child);  
 					if(maxChildPid < clone_child)
 						maxChildPid = clone_child;
 				}
+
 				if (status >>8 == PTRACE_EVENT_FORK) {
 					ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
 					//printf("PTRACE_EVENT_FORK child %d", clone_child);  
