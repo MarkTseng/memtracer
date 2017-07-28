@@ -89,7 +89,6 @@ static int symtab_build_section(Elf *elf, Elf_Scn *section,
 		sym->size = esym->st_size;
 		sym->weak = (ELF32_ST_BIND(esym->st_info) == STB_WEAK);
 
-    	//printf("[%s][%d] name: %s, addr:%#x \n", __func__, __LINE__, sym->name, sym->address);
 		count++;
 	}
 	return count;
@@ -125,8 +124,6 @@ static int symtab_build_file(const char *path, uintptr_t start, uintptr_t end)
 		return -1;
 	}
 	
-    //printf("[%s][%d] open lib: %s \n", __func__, __LINE__, path);
-
 	elf_version(EV_CURRENT);
 	Elf *elf = elf_begin(fd, ELF_C_READ, NULL);
 	if (elf == NULL) {
@@ -260,7 +257,6 @@ int readsyms(struct symbol **symbols, char *filename, int display, int pie)
 		exit(E_MALLOC);
 	}
 
-    printf("[%s] open elf file: %s\n",__func__, filename);
 	if ((fd = open(filename, O_RDONLY)) == ERR)
 	{
 	        printf( "couldn't open %s\n", filename);
@@ -419,7 +415,7 @@ void display_symbols(struct symbol *symbols, int total)
 	}
 	
 	for (i=0; i<total; i++) {
-		printf( "0x%08x %s\n", symbols[i].address, symbols[i].name);
+		printf( "0x%08lx %s\n", symbols[i].address, symbols[i].name);
 	}
 
 	printf( "\n");

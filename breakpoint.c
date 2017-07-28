@@ -10,10 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "callstack.h"
-#include "memblock.h"
 #include "breakpoint.h"
-#include "ptr_backtrace.h"
 #include "ptrace_utils.h"
 #include "symtab.h"
 #include "minigdb.h"
@@ -109,7 +106,7 @@ static void do_breakpoint_init(pid_t pid, struct breakpoint_s *bp,
 
 	/* read original code */
 	bp->entry_code = ptrace_get_data(pid, bp->entry_address);
-    printf("[%s][%d] symbol: %s,  entry_code: %#x, entry_address: %#x \n", __func__, __LINE__, bp->name, bp->entry_code, bp->entry_address);
+    printf("symbol: %s,  entry_code: %#x, entry_address: %#x", bp->name, bp->entry_code, bp->entry_address);
 
 	/* write the trap instruction 'int 3' into the address */
 	ptrace_set_int3(pid, bp->entry_address, bp->entry_code);

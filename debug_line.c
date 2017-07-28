@@ -72,7 +72,6 @@ static int debug_line_build_dwarf(int fd, size_t offset)
 		dwarf_lineaddr(dwarf_onesrcline(linebuf, linecount - 1), &dd->end);
 		dd->start += offset;
 		dd->end += offset;
-        printf("[%s][%d] : start: %#x, end: %#x \n", __func__, __LINE__, dd->start, dd->end);
 
 		count++;
 	}
