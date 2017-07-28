@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <sys/syscall.h>
 #include <errno.h>
+#include <sched.h>
 // libunwind header
 #include <libunwind.h>
 #include <libunwind-arm.h>
@@ -436,10 +437,12 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 	pid_t new_child;
 	pid_t clone_child;
 	int maxChildPid=0;
+	int status;
+	struct sched_param param;
 
     if(argc == 1)
     {
-        fprintf(stderr, "usage memtrace <bin>");
+        fprintf(stderr, "usage memtrace <bin>\n");
         exit(-1);
     }
 
@@ -477,9 +480,11 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 		g_mainPid = getpid();
         printf("g_child: %d", g_child);
         printf("g_mainPid: %d", g_mainPid);
-			
-		int status;
-      
+		param.sched_priority = sched_get_priority_max(SCHED_RR);
+		if( sched_setscheduler( 0, SCHED_RR, &param ) == -1 ) {
+			perror("no permission to get SCHED_RR");
+			exit(1);
+		}
 		new_child = waitpid(-1, &status, __WALL);
 		if (WIFSTOPPED(status)) {
 			printf("pid: %d, stop signal: %d", new_child, WSTOPSIG(status));  

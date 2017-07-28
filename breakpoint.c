@@ -82,14 +82,14 @@ static int bph_calloc(uintptr_t pointer, uintptr_t nmemb, uintptr_t size)
 
 static int bph_mmap(uintptr_t ret_map_addr, uintptr_t none1, uintptr_t length)
 {
-	log_debug("-- mmap addr:%#x, length:%#x\n", ret_map_addr, length);
+	log_debug("-- mmap addr:%#x, length:%#x", ret_map_addr, length);
 
 	return 0;
 }
 
 static int bph_munmap(uintptr_t none1, uintptr_t unmap_addr, uintptr_t length)
 {
-	log_debug("-- munmap addr:%#x, length:%#x\n", unmap_addr, length);
+	log_debug("-- munmap addr:%#x, length:%#x", unmap_addr, length);
 
 	return 0;
 }
