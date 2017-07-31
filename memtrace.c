@@ -50,8 +50,8 @@ static struct UPT_info *ui;
 static int g_readelf = 0;
 struct breakpoint_s *bp = NULL;
 uintptr_t return_address = 0, return_code = 0;
-uintptr_t arg1 = 0, arg2 = 0;
-unsigned int breaktrap = 0;
+unsigned long breaktrap1 = 0;
+unsigned long breaktrap2 = 0;
 int g_entryCnt = 0;
 const int long_size = sizeof(long);
 char dlname[128];
@@ -62,6 +62,8 @@ typedef struct{
     long return_opc;   
     long entry_addr; 
     long entry_opc; 
+	uintptr_t arg1;
+	uintptr_t arg2;
     UT_hash_handle hh; /*uthash handle*/
 }breakPointTable, brpSymbol;
 breakPointTable *brptab=NULL, *brp;
@@ -69,6 +71,7 @@ breakPointTable *brptab=NULL, *brp;
 struct symbol *symbols = NULL;
 int symtot = 0;
 unsigned long main_addr = 0;
+long main_orig_opc = 0;
 
 typedef struct{
     long return_addr; 
@@ -79,8 +82,6 @@ backTraceCacheTable *btctab=NULL, *btc;
 
 // memleax for compile use
 #define BACKTRACE_MAX (5)
-uintptr_t g_current_entry;
-pid_t g_current_thread;
 int opt_backtrace_limit = BACKTRACE_MAX;
 const char *opt_debug_info_file;
 
@@ -100,6 +101,17 @@ void deleteAllList()
 	HASH_ITER(hh, brptab, current_brp, brp_tmp) {
 		HASH_DEL(brptab, current_brp);  /* delete it (users advances to next) */
 		free(current_brp);             /* free it */
+	}
+}
+
+void dumpAllBrkList()
+{
+	brpSymbol *current_brp, *brp_tmp;
+
+	// free breakPointTable
+	HASH_ITER(hh, brptab, current_brp, brp_tmp) {
+		YELLOWprintf("RA:%#lx",current_brp->return_addr);
+		YELLOWprintf("EA:%#lx",current_brp->entry_addr);
 	}
 }
 
@@ -149,28 +161,6 @@ void getdata(pid_t child, long addr, char *str, int len)
         memcpy(laddr, data.chars, j);
     }
     str[len] = '\0';       
-}
-
-long main_orig_opc = 0;
-#define MAIN_ADDRESS  main_addr
-void set_breakpoint(pid_t child)
-{
-    long orig = ptrace(PTRACE_PEEKTEXT, child, MAIN_ADDRESS, NULL);
-    long trap;
-
-    trap = TRAPINT;
-    printf("[+] Add breakpoint on 0x%lx, orig_opc=%#lx ", MAIN_ADDRESS, orig);
-
-    main_orig_opc = orig;
-    ptrace(PTRACE_POKETEXT, child, MAIN_ADDRESS, trap);
-    orig = ptrace(PTRACE_PEEKTEXT, child, MAIN_ADDRESS, NULL);
-
-}
-
-void remove_breakpoint(pid_t child)
-{
-    printf("[-] Removing breakpoint from 0x%lx", MAIN_ADDRESS);
-    ptrace(PTRACE_POKETEXT, child, MAIN_ADDRESS, main_orig_opc);
 }
 
 /* isintbreakpoint checks the supplied int to see if it contains a trap instruction */
@@ -490,7 +480,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			printf("pid: %d, stop signal: %d", new_child, WSTOPSIG(status));  
 			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT);
             /* breakpoint in main */
-            set_breakpoint(g_child);
+            //set_breakpoint(g_child);
+			main_orig_opc = setbreakpoint(g_child, main_addr);
 		}
 		ptrace(PTRACE_CONT,new_child, NULL, NULL);
         /* trace pid */
@@ -507,53 +498,43 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
                 //printf("[WIFSTOPPED] status:%#x , sig:%d, pid:%d ", status, WSTOPSIG(status), new_child);
 				if(WSTOPSIG(status)== SIGILL)
                 {  
-					if ((bp = breakpoint_by_entry(regs.regs.ARM_pc)) != NULL)
+					long pc =  regs.regs.ARM_pc;
+					if ((bp = breakpoint_by_entry(pc)) != NULL)
 					{
 						g_entryCnt++;
 						/* recover entry code */
 						clearbreakpoint(new_child, bp->entry_address, bp->entry_code);
 
 						/* set breakpoint at return address */
-						return_address = regs.regs.ARM_lr;
-						//return_code = ptrace((__ptrace_request)PTRACE_PEEKTEXT, new_child, return_address);
-						breaktrap = setbreakpoint(new_child, return_address);
-						//printf("[pid: %d] function entry: symbol = %s, address:%#x, g_entryCnt=%d", new_child, bp->name, bp->entry_address, g_entryCnt);
-						//printf("[pid: %d] function return address:%#x", new_child, return_address);
+						breaktrap1 = setbreakpoint(new_child, regs.regs.ARM_lr);
+						//printf("[pid: %d] function entry: symbol = %s, address:%#x, g_entryCnt=%d, RA:%#lx", new_child, bp->name, bp->entry_address, g_entryCnt, regs.regs.ARM_lr);
 						brp = (brpSymbol*)malloc(sizeof(brpSymbol));
-						brp->return_addr = return_address;
-						brp->return_opc = breaktrap;
+						brp->return_addr = regs.regs.ARM_lr;
+						brp->return_opc = breaktrap1;
 						brp->entry_addr = bp->entry_address;
 						brp->entry_opc = bp->entry_code;
+						brp->arg1 = regs.regs.ARM_r0;
+						brp->arg2 = regs.regs.ARM_r1;
 						HASH_ADD_INT(brptab, return_addr, brp);
-						/* save arguments */
-						arg1 = regs.regs.ARM_r0;
-						arg2 = regs.regs.ARM_r1;
+
 						if(strcmp("dlopen", bp->name) == 0)
 						{
 							memset(dlname,0,sizeof(dlname));
-							getdata(new_child, arg1, dlname, 32);
+							getdata(new_child, brp->arg1, dlname, 32);
 							printf("call dlopen: %s ", dlname);
 						}
 						//dump_regs(&regs, stdout);
 					} else {
-						//printf("[SIGILL] status:%#x , sig:%d, pid:%d ", status, WSTOPSIG(status), new_child);
-						long pc =  regs.regs.ARM_pc + 1;
+						pc+=1;
 						HASH_FIND_INT(brptab, &pc, brp);
 						if(brp){
 							//dump_regs(&regs, stdout);
 							g_entryCnt--;
-							HASH_DEL(brptab, brp);
-
 							/* -- at function return */
-							//printf("function return: R%#x, g_entryCnt=%d", brp->return_addr, g_entryCnt);
+							//YELLOWprintf("function return address: %#lx", brp->return_addr);
 							clearbreakpoint(new_child, brp->return_addr, brp->return_opc);
 							bp = breakpoint_by_entry( brp->entry_addr);
-
-							g_current_entry = brp->entry_addr;	
-							g_current_thread = new_child;
-
 							//printf("calle%s, R%#lx", bp->name, brp->return_addr);
-							
 							do_backtrace(new_child, brp->return_addr,0);
 							//callstack_print(callstack_current());
 							if(strcmp("dlopen", bp->name) == 0)
@@ -572,15 +553,21 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 									}
 								}
 							}else{
-								if (bp->handler(regs.regs.ARM_r0, arg1, arg2) != 0) {
+								if (bp->handler(regs.regs.ARM_r0, brp->arg1, brp->arg2) != 0) {
 									printf("\n== Not enough memory.");
 									break;
 								}
 							}
 							/*restore instruction(s)*/
 							//printf("recovery breakpoin entry_address:%#x", brp->entry_addr);
-							breaktrap = setbreakpoint(new_child, brp->entry_addr);
+							breaktrap2 = setbreakpoint(new_child, brp->entry_addr);
+							HASH_DEL(brptab, brp);
 							free(brp);
+						}else{
+							YELLOWprintf("WARNG: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt);
+							//dumpAllBrkList();
+							//dump_regs(&regs, stdout);
+                    		//do_backtrace(new_child, 0, 1);
 						}
 					}
 				}
@@ -600,7 +587,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					symtab_build(g_child);
 					/* malloc .... breakpoint */
 					breakpoint_init(g_child);
-					remove_breakpoint(g_child);
+					//remove_breakpoint(g_child);
+					clearbreakpoint(g_child, main_addr, main_orig_opc);
+					printf("clearbreakpoint main_addr:%#lx", main_addr);
 					g_readelf = 1;
 				}
 
@@ -613,7 +602,6 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						getPidName(i, pidName);
 						printf("[SIGSEGV] pid: %d %s, stop signal: %d", i, pidName, WSTOPSIG(status));  
                     	do_backtrace(i, 0, 1);
-
                     }
 					dump_regs(&regs, stdout);
                     break;
@@ -678,6 +666,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 	breakpoint_cleanup(g_child);
 	unw_destroy_addr_space(as);
+	dumpAllBrkList();
 	deleteAllList();
 	printf("memtrace exit");
 	return 0;

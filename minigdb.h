@@ -17,5 +17,6 @@ extern const char *opt_debug_info_file;
 #define ANSI_COLOR_RESET   "\x1b[0m"
 #define printf(fmt, args...)     printf(ANSI_COLOR_RED "[memtrace] " fmt ANSI_COLOR_RESET "\n", ## args)
 #define log_debug(...) printf(__VA_ARGS__)
+#define YELLOWprintf(fmt, args...)     printf(ANSI_COLOR_YELLOW "[memtrace] " fmt ANSI_COLOR_RESET "\n", ## args)
 
 #endif
