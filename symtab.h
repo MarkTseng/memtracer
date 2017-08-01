@@ -37,6 +37,7 @@ struct symbol
 int readsyms(struct symbol **symbols, char *filename, int display, int pie);
 void display_symbols(struct symbol *symbols, int total);
 unsigned long symaddr(struct symbol *symbols, int total, char *name);
+int symtab_build_file(const char *path, uintptr_t start, uintptr_t end);
 
 
 #endif

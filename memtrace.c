@@ -549,6 +549,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 									{	
 										//printf("pid:%d, solib path:%s, star%#x, end:%#x", i,path,start,end);
 										//ptr_maps_build_file(path, start, end);
+										symtab_build_file(path, start, end);
 										break;
 									}
 								}

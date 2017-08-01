@@ -88,6 +88,7 @@ static int symtab_build_section(Elf *elf, Elf_Scn *section,
 		sym->address = esym->st_value - base_addr + offset - 1;
 		sym->size = esym->st_size;
 		sym->weak = (ELF32_ST_BIND(esym->st_info) == STB_WEAK);
+		//printf("[%s] name:%s, addr: %#lx",__func__,  sym->name, sym->address);
 
 		count++;
 	}
@@ -116,7 +117,7 @@ static uintptr_t symtab_elf_base(Elf *elf)
 	return 0;
 }
 
-static int symtab_build_file(const char *path, uintptr_t start, uintptr_t end)
+int symtab_build_file(const char *path, uintptr_t start, uintptr_t end)
 {
 	/* open file */
 	int fd = open(path, O_RDONLY);
