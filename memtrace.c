@@ -29,17 +29,7 @@
 #include "proc_info.h"
 #include "list.h"
 #include "hash.h"
-
-// define
-#define ERR -1
-#define E_OK 0
-#define E_ARGS 1
-#define E_MALLOC 2
-#define E_FORK 3
-#define E_PTRACE 4
-#define E_UNKNOWN 5
-#define TRAPINT (0xe7ffffff)
-#define TRAPHALF (0xdeff)
+#include "ptrace_utils.h"
 
 // global variable
 pid_t g_child;
@@ -52,6 +42,8 @@ struct breakpoint_s *bp = NULL;
 uintptr_t return_address = 0, return_code = 0;
 unsigned long breaktrap1 = 0;
 unsigned long breaktrap2 = 0;
+int sig = 0;
+int ptrace_event = 0;
 int g_entryCnt = 0;
 const int long_size = sizeof(long);
 char dlname[128];
@@ -64,6 +56,7 @@ typedef struct{
     long entry_opc; 
 	uintptr_t arg1;
 	uintptr_t arg2;
+	int pid;
     UT_hash_handle hh; /*uthash handle*/
 }breakPointTable, brpSymbol;
 breakPointTable *brptab=NULL, *brp;
@@ -81,7 +74,7 @@ typedef struct{
 backTraceCacheTable *btctab=NULL, *btc;
 
 // memleax for compile use
-#define BACKTRACE_MAX (5)
+#define BACKTRACE_MAX (10)
 int opt_backtrace_limit = BACKTRACE_MAX;
 const char *opt_debug_info_file;
 
@@ -104,14 +97,14 @@ void deleteAllList()
 	}
 }
 
-void dumpAllBrkList()
+void dumpAllBrkList(pid_t pid)
 {
 	brpSymbol *current_brp, *brp_tmp;
 
 	// free breakPointTable
 	HASH_ITER(hh, brptab, current_brp, brp_tmp) {
-		YELLOWprintf("RA:%#lx",current_brp->return_addr);
-		YELLOWprintf("EA:%#lx",current_brp->entry_addr);
+		YELLOWprintf("RA:%#lx, opc:%#lx",current_brp->return_addr,  ptrace(PTRACE_PEEKTEXT, pid, current_brp->return_addr & ~0x1));
+		YELLOWprintf("EA:%#lx, opc:%#lx",current_brp->entry_addr, ptrace(PTRACE_PEEKTEXT, pid, current_brp->entry_addr & ~0x1));
 	}
 }
 
@@ -126,7 +119,7 @@ void getPidName(pid_t pid, char *name)
 		sprintf(pname, "/proc/%d/stat", pid);
 		filp = fopen(pname, "r");
 		if (filp == NULL) {
-			perror("Error in open /proc/pid/stat");
+			//perror("Error in open /proc/pid/stat");
 			return;
 		}
 
@@ -162,186 +155,6 @@ void getdata(pid_t child, long addr, char *str, int len)
     }
     str[len] = '\0';       
 }
-
-/* isintbreakpoint checks the supplied int to see if it contains a trap instruction */
-int isintbreakpoint(int trapint, int lsb)
-{
-	if ( ( ((lsb & 0x1) == 0x0) && (trapint == TRAPINT) ) ||
-		 ( ((lsb & 0x3) == 0x1) && ( (trapint & 0xffff) == TRAPHALF) ) ||
-		 ( ((lsb & 0x3) == 0x3) && ( ((trapint >> 16) & 0xffff) == TRAPHALF) ) ) {
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-/* read a word from child process */
-unsigned long readchildword(pid_t pid, unsigned long addr)
-{
-	unsigned long word;
-
-	/* read a word from child process */
-	word = ptrace(PTRACE_PEEKTEXT, pid, addr, NULL);
-	if (word == -1) {
-		if (errno) {
-			printf( "readchildword ptrace_peektext error: %s", strerror(errno));
-			exit(E_PTRACE);
-		}
-	}
-
-	//printf( "read 0x%08lx from %ld:0x%x", word, pid, addr);
-
-	return word;
-}
-
-/* write a word to child process */
-void writechildword(pid_t pid, unsigned long addr, unsigned long word)
-{
-	unsigned long check;
-
-	/* write word to child process */
-	if (ptrace(PTRACE_POKETEXT, pid, addr, word)) {
-		printf( "writechildword ptrace_poketext error: %s", strerror(errno));
-		exit(E_PTRACE);
-	}
-
-	check = readchildword(pid, addr);
-
-	if (check != word) {
-		printf( "writechildword word not written error");
-		exit(E_PTRACE);
-	}
-
-	//printf("wrote 0x%08lx to %ld:0x%x", word, pid, addr);
-}
-
-/* set breakpoint */
-unsigned int setbreakpoint(pid_t exe, unsigned long breakaddr)
-{
-	unsigned long addr, origdata, data;
-
-	if (!breakaddr || !exe) {
-		//printf( "setbreakpoint: invalid parameters");
-		return 0;
-	}
-	
-	//printf( "setbreakpoint: %ld, 0x%x", exe, breakaddr);
-
-	int thumb = 0;
-
-	addr = breakaddr & ~0x1; /* break function with LSB cleared */
-
-	/* arm addresses are 32bit word aligned */
-	origdata = readchildword(exe, addr & ~0x3);
-
-	if (breakaddr & 0x1) {
-		thumb = 1;
-	}
-
-	if ((!thumb) && (addr & 0x2)) {
-		printf( "setbreakpoint: arm, address misalignment, 0x%lx", addr);
-		exit(E_UNKNOWN);
-	}
-
-	if (thumb) {
-		/* thumb */
-
-		if (addr & 0x2) {
-			/* odd half */
-			/* check if breakpoint already set */
-			if (isintbreakpoint(origdata, breakaddr & 0x3)) {
-				return origdata;
-			}
-			data = (origdata & 0xffff) | (TRAPHALF << 16);
-		} else {
-			/* even half (e.g. word aligned) */
-			/* check if breakpoint already set */
-			if (isintbreakpoint(origdata, breakaddr & 0x3)) {
-				return origdata;
-			}
-			data = (origdata & ~0xffff) | TRAPHALF;
-		}
-
-	} else {
-		/* arm or unsure */
-
-		/* check if breakpoint already set */
-		if (isintbreakpoint(origdata, 0)) {
-			return origdata;
-		}
-		/* we need to write addr+2 for arm and addr for thumb */
-		data = TRAPINT;
-	}
-
-	writechildword(exe, addr & ~0x3, data);
-
-	return origdata;
-
-}
-
-
-/* clear breakpoint */
-void clearbreakpoint(pid_t exe, unsigned long breakaddr, unsigned int origint)
-{
-	unsigned long addr, origdata, data;
-
-	if (!breakaddr || !exe) {
-		//printf( "clearbreakpoint: invalid parameters");
-		return;
-	}
-	
-	//printf( "clearbreakpoint: %ld, 0x%x", exe, breakaddr);
-
-	int thumb = 0;
-
-	addr = breakaddr & ~0x1; /* break function with LSB cleared */
-
-	/* arm addresses are 32bit word aligned */
-	origdata = readchildword(exe, addr & ~0x3);
-
-	if (breakaddr & 0x1) {
-		thumb = 1;
-	}
-
-	if ((!thumb) && (addr & 0x2)) {
-		printf( "clearbreakpoint: arm, address misalignment, 0x%lx", addr);
-		exit(E_UNKNOWN);
-	}
-
-	if (thumb) {
-		/* thumb */
-
-		if (addr & 0x2) {
-			/* odd half */
-
-			/* check if breakpoint is set */
-			if (!isintbreakpoint(origdata, breakaddr & 0x3)) {
-				return;
-			}
-			data = (origdata & 0xffff) | (origint & ~0xffff);
-		} else {
-			/* even half */
-
-			/* check if breakpoint is set */
-			if (!isintbreakpoint(origdata, breakaddr & 0x3)) {
-				return;
-			}
-			data = (origdata & ~0xffff) | (origint & 0xffff);
-		}
-
-	} else {
-		/* arm or unsure */
-
-		/* check if breakpoint is set */
-		if (!isintbreakpoint(origdata, 0)) {
-			return;
-		}
-		data = origint;
-	}
-
-	writechildword(exe, addr & ~0x3, data);
-}
-
 
 static void dump_regs(struct user const *regs, FILE *outfp)
 {
@@ -394,7 +207,7 @@ static void do_backtrace(pid_t child, long pc,int displayStackFrame) {
 			fname[0] = '\0';
 			(void) unw_get_proc_name(&c, fname, sizeof(fname), &offset);
 			if(displayStackFrame==1)
-				printf("%p : (%s+0x%x)\n", (void *)pc, fname, (int) offset);
+				printf("%p(%#lx) : (%s+0x%x)\n", (void *)pc, ptrace(PTRACE_PEEKTEXT, child, pc),fname, (int) offset);
 			if (cur < end) {
 				cur += snprintf(cur, end-cur, "\n%p:(%s+0x%x)\n", (void *)pc, fname, (int) offset);
 			}
@@ -487,26 +300,44 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
         /* trace pid */
 		while(1) {
             new_child = waitpid(-1, &status, __WALL);
+			// set all breakpoint
+			if((g_readelf == 0) && (new_child == g_child))
+			{
+				//printf("pid:%d, load symbol table, sig:%d", new_child, WSTOPSIG(status));
+				symtab_build(g_child);
+				breakpoint_init(g_child);
+				clearbreakpoint(g_child, main_addr, main_orig_opc);
+				printf("clearbreakpoint main_addr:%#lx", main_addr);
+				g_readelf = 1;
+			}
+
             memset(&regs, 0, sizeof(regs));
             ptrace(PTRACE_GETREGS, new_child, NULL, &regs);
+			ptrace_event = (status >> 16) & 0xff;
+			sig = WSTOPSIG(status);
             //dump_regs(&regs, stdout);
             //printf("[wait] status:%#x , sig:%d, pid:%d ", status, WSTOPSIG(status), new_child);
 			if(new_child == -1)
 				break;
 
+			long pc =  regs.regs.ARM_pc + 1;
+			//printf("pc:%#lx", pc);
+			//dumpAllBrkList(new_child);
             if (WIFSTOPPED(status)) {
                 //printf("[WIFSTOPPED] status:%#x , sig:%d, pid:%d ", status, WSTOPSIG(status), new_child);
 				if(WSTOPSIG(status)== SIGILL)
                 {  
-					long pc =  regs.regs.ARM_pc;
 					if ((bp = breakpoint_by_entry(pc)) != NULL)
 					{
+						//printf("pc in brp:%#lx", pc);
 						g_entryCnt++;
 						/* recover entry code */
 						clearbreakpoint(new_child, bp->entry_address, bp->entry_code);
+						//YELLOWprintf("pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
 
 						/* set breakpoint at return address */
 						breaktrap1 = setbreakpoint(new_child, regs.regs.ARM_lr);
+						//printf("RA brp set:%#lx", regs.regs.ARM_lr);
 						//printf("[pid: %d] function entry: symbol = %s, address:%#x, g_entryCnt=%d, RA:%#lx", new_child, bp->name, bp->entry_address, g_entryCnt, regs.regs.ARM_lr);
 						brp = (brpSymbol*)malloc(sizeof(brpSymbol));
 						brp->return_addr = regs.regs.ARM_lr;
@@ -525,7 +356,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						}
 						//dump_regs(&regs, stdout);
 					} else {
-						pc+=1;
+						//pc+=1;
+						//printf("pc in RA:%#lx", pc);
 						HASH_FIND_INT(brptab, &pc, brp);
 						if(brp){
 							//dump_regs(&regs, stdout);
@@ -565,12 +397,42 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							HASH_DEL(brptab, brp);
 							free(brp);
 						}else{
-							YELLOWprintf("WARNG: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt);
-							//dumpAllBrkList();
+							YELLOWprintf("WARNG: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
+							dumpAllBrkList(new_child);
 							//dump_regs(&regs, stdout);
-                    		//do_backtrace(new_child, 0, 1);
+                    		do_backtrace(new_child, 0, 1);
 						}
 					}
+				}
+
+				if(WSTOPSIG(status)== SIGTRAP)
+				{
+					//YELLOWprintf("ptrace_event:%d, sig:%d \n", ptrace_event, sig);
+					//YELLOWprintf("pc:%#lx, opc:%#lx,g_entryCnt:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt);
+					if (ptrace_event == PTRACE_EVENT_EXEC) 
+					{
+						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
+						//printf("PTRACE_EVENT_EXEC child %d", clone_child);  
+						if(maxChildPid < clone_child)
+							maxChildPid = clone_child;
+					}
+
+					if (ptrace_event == PTRACE_EVENT_CLONE) 
+					{
+						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
+						//printf("PTRACE_EVENT_CLONE: new_child: %d, clone_child: %d", new_child, clone_child);  
+						printf("pid %d create", clone_child);
+						if(maxChildPid < clone_child)
+							maxChildPid = clone_child;
+					}
+
+					if (ptrace_event == PTRACE_EVENT_EXIT) 
+					{
+						memset(pidName,0,sizeof(pidName));
+						getPidName(new_child, pidName);
+						printf("pid %d %s exit", new_child, pidName);
+					}	
+
 				}
 
 				if(WSTOPSIG(status)== SIGINT)
@@ -580,75 +442,23 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					printf("kill pid:%d, sig:%d", new_child, WSTOPSIG(status));
                 }
 
-				if((g_readelf == 0) && (new_child == g_child))
-				{
-					//printf("pid:%d, load symbol table, sig:%d", new_child, WSTOPSIG(status));
-					//addr_maps_build(g_child);
-					//ptr_maps_build(g_child);
-					symtab_build(g_child);
-					/* malloc .... breakpoint */
-					breakpoint_init(g_child);
-					//remove_breakpoint(g_child);
-					clearbreakpoint(g_child, main_addr, main_orig_opc);
-					printf("clearbreakpoint main_addr:%#lx", main_addr);
-					g_readelf = 1;
-				}
-
 				if(WSTOPSIG(status)== SIGSEGV)
                 {
 					int i;
+					breakpoint_cleanup(g_child);
 					for(i=g_child;i<=maxChildPid;i++)
                     {
 						memset(pidName,0,sizeof(pidName));
 						getPidName(i, pidName);
-						printf("[SIGSEGV] pid: %d %s, stop signal: %d", i, pidName, WSTOPSIG(status));  
-                    	do_backtrace(i, 0, 1);
+						if(strlen(pidName)!=0)
+						{
+							printf("[SIGSEGV] pid: %d %s, stop signal: %d", i, pidName, WSTOPSIG(status));  
+                    		do_backtrace(i, 0, 1);
+						}
                     }
 					dump_regs(&regs, stdout);
                     break;
                 }
-
-				if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXEC<<8))) {
-					ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-					//printf("PTRACE_EVENT_EXEC child %d", clone_child);  
-					if(maxChildPid < clone_child)
-						maxChildPid = clone_child;
-				}
-
-				if (status>>8 == (SIGTRAP | (PTRACE_EVENT_CLONE<<8))) {
-					ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-					//printf("PTRACE_EVENT_CLONE: new_child: %d, clone_child: %d", new_child, clone_child);  
-					printf("pid %d create", clone_child);
-					if(maxChildPid < clone_child)
-						maxChildPid = clone_child;
-				}
-
-				if (status>>8 == (SIGTRAP | (PTRACE_EVENT_EXIT<<8))) {
-					memset(pidName,0,sizeof(pidName));
-					getPidName(new_child, pidName);
-					printf("pid %d %s exit", new_child, pidName);
-				}	
-
-				if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK<<8))) {
-					ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-					//printf("PTRACE_EVENT_VFORK child %d", clone_child);  
-					if(maxChildPid < clone_child)
-						maxChildPid = clone_child;
-				}
-
-				if (status>>8 == (SIGTRAP | (PTRACE_EVENT_VFORK_DONE<<8))) {
-					ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-					//printf("PTRACE_EVENT_VFORK_DONE child %d", clone_child);  
-					if(maxChildPid < clone_child)
-						maxChildPid = clone_child;
-				}
-
-				if (status >>8 == PTRACE_EVENT_FORK) {
-					ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-					//printf("PTRACE_EVENT_FORK child %d", clone_child);  
-					if(maxChildPid < clone_child)
-						maxChildPid = clone_child;
-				}
 				ptrace(PTRACE_CONT,new_child, NULL, NULL);
 			}
 
@@ -667,7 +477,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 	breakpoint_cleanup(g_child);
 	unw_destroy_addr_space(as);
-	dumpAllBrkList();
+	dumpAllBrkList(g_child);
 	deleteAllList();
 	printf("memtrace exit");
 	return 0;

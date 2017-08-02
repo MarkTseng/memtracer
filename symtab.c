@@ -85,7 +85,7 @@ static int symtab_build_section(Elf *elf, Elf_Scn *section,
 		strncpy(sym->name, name, sizeof(sym->name));
 		sym->name[sizeof(sym->name) - 1] = '\0';
 
-		sym->address = esym->st_value - base_addr + offset - 1;
+		sym->address = esym->st_value - base_addr + offset;
 		sym->size = esym->st_size;
 		sym->weak = (ELF32_ST_BIND(esym->st_info) == STB_WEAK);
 		//printf("[%s] name:%s, addr: %#lx",__func__,  sym->name, sym->address);
@@ -382,9 +382,9 @@ int readsyms(struct symbol **symbols, char *filename, int display, int pie)
 						strncpy((*symbols)[sym_index].name, elf_strptr(elf, shdr.sh_link, sym.st_name), S_SYMNAME);
 						(*symbols)[sym_index].name[S_SYMNAME - 1] = 0x00;
 						if (pie) {
-							(*symbols)[sym_index].address = (Elf32_Addr)sym.st_value + ASLROFFSET -1;
+							(*symbols)[sym_index].address = (Elf32_Addr)sym.st_value + ASLROFFSET;
 						} else {
-							(*symbols)[sym_index].address = (Elf32_Addr)sym.st_value -1;
+							(*symbols)[sym_index].address = (Elf32_Addr)sym.st_value;
 						}
 						sym_index++;
 

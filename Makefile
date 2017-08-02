@@ -12,8 +12,8 @@ TARGET = memtrace
 TARGET2 = test
 TARGET3 = elf_parser
 
-SOURCES = breakpoint.c debug_file.c debug_line.c proc_info.c symtab.c 
-OBJS = breakpoint.o debug_file.o debug_line.o proc_info.o symtab.o 
+SOURCES = breakpoint.c debug_file.c debug_line.c proc_info.c symtab.c ptrace_utils.c 
+OBJS = breakpoint.o debug_file.o debug_line.o proc_info.o symtab.o ptrace_utils.o
 
 all: $(TARGET) $(TARGET2) $(TARGET3) 
 
@@ -46,3 +46,4 @@ debug_line.o: debug_line.c debug_line.h array.h minigdb.h proc_info.h \
  debug_file.h /usr/include/elfutils/libdw.h
 proc_info.o: proc_info.c proc_info.h
 symtab.o: symtab.c array.h minigdb.h proc_info.h debug_file.h
+ptrace_utils.o: ptrace_utils.c ptrace_utils.h
