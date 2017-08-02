@@ -120,10 +120,10 @@ void breakpoint_init(pid_t pid)
 	do_breakpoint_init(pid, &g_breakpoints[1], "free", bph_free);
 	do_breakpoint_init(pid, &g_breakpoints[2], "realloc", bph_realloc);
 	do_breakpoint_init(pid, &g_breakpoints[3], "calloc", bph_calloc);
-	//do_breakpoint_init(pid, &g_breakpoints[4], "_Znwj", bph_new);
-	//do_breakpoint_init(pid, &g_breakpoints[5], "_Znaj", bph_newa);
-	//do_breakpoint_init(pid, &g_breakpoints[6], "_ZdlPv", bph_delete);
-	//do_breakpoint_init(pid, &g_breakpoints[7], "_ZdaPv", bph_deletea);
+	do_breakpoint_init(pid, &g_breakpoints[4], "_Znwj", bph_new);
+	do_breakpoint_init(pid, &g_breakpoints[5], "_Znaj", bph_newa);
+	do_breakpoint_init(pid, &g_breakpoints[6], "_ZdlPv", bph_delete);
+	do_breakpoint_init(pid, &g_breakpoints[7], "_ZdaPv", bph_deletea);
 	do_breakpoint_init(pid, &g_breakpoints[8], "dlopen", bph_dlopen);
 	do_breakpoint_init(pid, &g_breakpoints[9], "mmap", bph_mmap);
 	do_breakpoint_init(pid, &g_breakpoints[10], "munmap", bph_munmap);

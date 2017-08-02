@@ -293,7 +293,6 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			printf("pid: %d, stop signal: %d", new_child, WSTOPSIG(status));  
 			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT);
             /* breakpoint in main */
-            //set_breakpoint(g_child);
 			main_orig_opc = setbreakpoint(g_child, main_addr);
 		}
 		ptrace(PTRACE_CONT,new_child, NULL, NULL);
@@ -380,7 +379,6 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 									if(path != NULL)
 									{	
 										//printf("pid:%d, solib path:%s, star%#x, end:%#x", i,path,start,end);
-										//ptr_maps_build_file(path, start, end);
 										symtab_build_file(path, start, end);
 										break;
 									}
