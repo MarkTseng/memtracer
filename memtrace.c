@@ -397,10 +397,10 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							HASH_DEL(brptab, brp);
 							free(brp);
 						}else{
-							YELLOWprintf("WARNG: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
-							dumpAllBrkList(new_child);
+							//YELLOWprintf("WARNG: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
+							//dumpAllBrkList(new_child);
 							//dump_regs(&regs, stdout);
-                    		do_backtrace(new_child, 0, 1);
+                    		//do_backtrace(new_child, 0, 1);
 						}
 					}
 				}
