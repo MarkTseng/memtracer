@@ -14,7 +14,7 @@
 #include "ptrace_utils.h"
 #include "symtab.h"
 #include "minigdb.h"
-#define MAX_BREAKPINT_NUM (11)
+#define MAX_BREAKPINT_NUM (7)
 struct breakpoint_s g_breakpoints[MAX_BREAKPINT_NUM];
 
 static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
