@@ -318,8 +318,11 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
             //printf("[wait] status:%#x , sig:%d, pid:%d ", status, WSTOPSIG(status), new_child);
 			if(new_child == -1)
 				break;
-
+#ifndef RPI
 			long pc =  regs.regs.ARM_pc + 1;
+#else
+			long pc =  regs.regs.ARM_pc;
+#endif
 			//printf("pc:%#lx", pc);
 			//dumpAllBrkList(new_child);
             if (WIFSTOPPED(status)) {
@@ -475,7 +478,6 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 	breakpoint_cleanup(g_child);
 	unw_destroy_addr_space(as);
-	dumpAllBrkList(g_child);
 	deleteAllList();
 	printf("memtrace exit");
 	return 0;

@@ -24,6 +24,7 @@ static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
 	return 0;
 }
 
+#if 0
 static int bph_new(uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
 	//log_debug("-- new size:%ld ret:%lx\n", size, pointer);
@@ -51,6 +52,7 @@ static int bph_deletea(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 
 	return 0;
 }
+#endif
 
 static int bph_dlopen(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
@@ -120,13 +122,15 @@ void breakpoint_init(pid_t pid)
 	do_breakpoint_init(pid, &g_breakpoints[1], "free", bph_free);
 	do_breakpoint_init(pid, &g_breakpoints[2], "realloc", bph_realloc);
 	do_breakpoint_init(pid, &g_breakpoints[3], "calloc", bph_calloc);
-	do_breakpoint_init(pid, &g_breakpoints[4], "_Znwj", bph_new);
-	do_breakpoint_init(pid, &g_breakpoints[5], "_Znaj", bph_newa);
-	do_breakpoint_init(pid, &g_breakpoints[6], "_ZdlPv", bph_delete);
-	do_breakpoint_init(pid, &g_breakpoints[7], "_ZdaPv", bph_deletea);
-	do_breakpoint_init(pid, &g_breakpoints[8], "dlopen", bph_dlopen);
-	do_breakpoint_init(pid, &g_breakpoints[9], "mmap", bph_mmap);
-	do_breakpoint_init(pid, &g_breakpoints[10], "munmap", bph_munmap);
+	do_breakpoint_init(pid, &g_breakpoints[4], "dlopen", bph_dlopen);
+	do_breakpoint_init(pid, &g_breakpoints[5], "mmap", bph_mmap);
+	do_breakpoint_init(pid, &g_breakpoints[6], "munmap", bph_munmap);
+#if 0
+	do_breakpoint_init(pid, &g_breakpoints[7], "_Znwj", bph_new);
+	do_breakpoint_init(pid, &g_breakpoints[8], "_Znaj", bph_newa);
+	do_breakpoint_init(pid, &g_breakpoints[9], "_ZdlPv", bph_delete);
+	do_breakpoint_init(pid, &g_breakpoints[10], "_ZdaPv", bph_deletea);
+#endif
 }
 
 void breakpoint_cleanup(pid_t pid)
