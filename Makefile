@@ -11,8 +11,8 @@ TARGET = memtrace
 TARGET2 = test
 TARGET3 = elf_parser
 
-SOURCES = breakpoint.c debug_file.c debug_line.c proc_info.c symtab.c ptrace_utils.c 
-OBJS = breakpoint.o debug_file.o debug_line.o proc_info.o symtab.o ptrace_utils.o
+SOURCES = breakpoint.c debug_file.c debug_line.c proc_info.c symtab.c ptrace_utils.c memblock.c
+OBJS = breakpoint.o debug_file.o debug_line.o proc_info.o symtab.o ptrace_utils.o memblock.o
 
 all: $(TARGET) $(TARGET2) $(TARGET3) 
 
@@ -38,7 +38,7 @@ install :
 uninstall :
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(TARGET)
 
-breakpoint.o: breakpoint.c hash.h list.h \
+breakpoint.o: breakpoint.c hash.h list.h memblock.h \
 	 breakpoint.h ptrace_utils.h symtab.h minigdb.h
 debug_file.o: debug_file.c debug_file.h minigdb.h
 debug_line.o: debug_line.c debug_line.h array.h minigdb.h proc_info.h \
@@ -46,3 +46,4 @@ debug_line.o: debug_line.c debug_line.h array.h minigdb.h proc_info.h \
 proc_info.o: proc_info.c proc_info.h
 symtab.o: symtab.c array.h minigdb.h proc_info.h debug_file.h
 ptrace_utils.o: ptrace_utils.c ptrace_utils.h
+memblock.o: memblock.c memblock.h
