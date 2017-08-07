@@ -30,6 +30,7 @@
 #include "list.h"
 #include "hash.h"
 #include "ptrace_utils.h"
+#include "memblock.h"
 
 // global variable
 pid_t g_child;
@@ -479,6 +480,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 	breakpoint_cleanup(g_child);
 	unw_destroy_addr_space(as);
 	deleteAllList();
+	memblock_dump();
 	printf("memtrace exit");
 	return 0;
 }
