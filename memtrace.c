@@ -387,12 +387,14 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 										break;
 									}
 								}
-							}else{
-								if (bp->handler(regs.regs.ARM_r0, brp->arg1, brp->arg2) != 0) {
-									printf("\n== Not enough memory.");
-									break;
-								}
 							}
+							printf("[%d] caller: %s, ret=%#lx, argv1=%#lx, argv2=%#lx", new_child, bp->name, regs.regs.ARM_r0, brp->arg1, brp->arg2);
+                    		do_backtrace(new_child, 0, 1);
+							if (bp->handler(regs.regs.ARM_r0, brp->arg1, brp->arg2) != 0) {
+								printf("\n== Not enough memory.");
+								break;
+							}
+							
 							/*restore instruction(s)*/
 							//printf("recovery breakpoin entry_address:%#x", brp->entry_addr);
 							breaktrap2 = setbreakpoint(new_child, brp->entry_addr);
