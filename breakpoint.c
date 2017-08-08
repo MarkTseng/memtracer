@@ -11,7 +11,7 @@
 #define MAX_BREAKPINT_NUM (7)
 struct breakpoint_s g_breakpoints[MAX_BREAKPINT_NUM];
 
-static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
+static int bph_malloc(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
 	//log_debug("-- malloc pointer:%lx, size: %#lx\n", pointer, size);
 	memblock_new(pointer, size);
@@ -19,28 +19,28 @@ static int bph_malloc(uintptr_t pointer, uintptr_t size, uintptr_t none)
 }
 
 #if 0
-static int bph_new(uintptr_t pointer, uintptr_t size, uintptr_t none)
+static int bph_new(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
 	//log_debug("-- new size:%ld ret:%lx\n", size, pointer);
 
 	return 0;
 }
 
-static int bph_newa(uintptr_t pointer, uintptr_t size, uintptr_t none)
+static int bph_newa(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
 	//log_debug("-- newa size:%ld ret:%lx\n", size, pointer);
 
 	return 0;
 }
 
-static int bph_delete(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
+static int bph_delete(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
 	//log_debug("-- delete point:%lx\n", pointer);
 
 	return 0;
 }
 
-static int bph_deletea(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
+static int bph_deletea(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
 	//log_debug("-- deletea point:%lx\n", pointer);
 
@@ -48,21 +48,26 @@ static int bph_deletea(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 }
 #endif
 
-static int bph_dlopen(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
+static int bph_dlopen(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
 	//log_debug("-- dlopen ret:%#x, p1:%#x, p2:%#x\n", none1, pointer, none2);
 
 	return 0;
 }
 
-static int bph_free(uintptr_t none1, uintptr_t pointer, uintptr_t none2)
+static int bph_free(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
 	//log_debug("-- free point:%lx\n", pointer);
+	if(memblock_search(pointer)==NULL)
+	{	
+		log_debug("-- free point:%lx\n", pointer);
+    	do_backtrace(pid, 0, 1);
+	}
 	memblock_delete(memblock_search(pointer));
 	return 0;
 }
 
-static int bph_realloc(uintptr_t new_pointer, uintptr_t old_pointer, uintptr_t size)
+static int bph_realloc(int pid, uintptr_t new_pointer, uintptr_t old_pointer, uintptr_t size)
 {
 	//log_debug("-- realloc pointer:%lx->%lx size:%ld\n", old_pointer, new_pointer, size);
     if (new_pointer == old_pointer) {
@@ -75,21 +80,21 @@ static int bph_realloc(uintptr_t new_pointer, uintptr_t old_pointer, uintptr_t s
 	return 0;
 }
 
-static int bph_calloc(uintptr_t pointer, uintptr_t nmemb, uintptr_t size)
+static int bph_calloc(int pid, uintptr_t pointer, uintptr_t nmemb, uintptr_t size)
 {
 	//log_debug("-- calloc pointer:%lx nmemb:%ld size:%ld\n", pointer, nmemb, size);
 	memblock_new(pointer, nmemb * size);
 	return 0;
 }
 
-static int bph_mmap(uintptr_t ret_map_addr, uintptr_t none1, uintptr_t length)
+static int bph_mmap(int pid, uintptr_t ret_map_addr, uintptr_t none1, uintptr_t length)
 {
 	log_debug("-- mmap addr:%#x, length:%#x", ret_map_addr, length);
 
 	return 0;
 }
 
-static int bph_munmap(uintptr_t none1, uintptr_t unmap_addr, uintptr_t length)
+static int bph_munmap(int pid, uintptr_t none1, uintptr_t unmap_addr, uintptr_t length)
 {
 	log_debug("-- munmap addr:%#x, length:%#x", unmap_addr, length);
 

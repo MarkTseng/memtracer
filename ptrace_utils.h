@@ -3,6 +3,7 @@
 
 #include <sys/ptrace.h>
 #include <stdio.h>
+#include <libunwind.h>
 
 #include <sys/user.h>
 #include <stdint.h>
@@ -41,6 +42,8 @@ void ptrace_continue(pid_t pid, int signum);
 void ptrace_attach(pid_t pid);
 void ptrace_trace_child(pid_t pid);
 void ptrace_detach(pid_t pid, int signum);
-
-
+void do_backtrace(pid_t child, long pc,int displayStackFrame);
+void deleteCacheList();
+void backtrace_init();
+void backtrace_deinit();
 #endif

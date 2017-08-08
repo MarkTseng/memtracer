@@ -36,8 +36,6 @@
 pid_t g_child;
 pid_t g_mainPid;
 struct user regs;
-static unw_addr_space_t as;
-static struct UPT_info *ui;
 static int g_readelf = 0;
 struct breakpoint_s *bp = NULL;
 uintptr_t return_address = 0, return_code = 0;
@@ -67,13 +65,6 @@ int symtot = 0;
 unsigned long main_addr = 0;
 long main_orig_opc = 0;
 
-typedef struct{
-    long return_addr; 
-	char *backtrace;
-    UT_hash_handle hh; /*uthash handle*/
-}backTraceCacheTable, btctSymbol;
-backTraceCacheTable *btctab=NULL, *btc;
-
 // memleax for compile use
 #define BACKTRACE_MAX (10)
 int opt_backtrace_limit = BACKTRACE_MAX;
@@ -81,15 +72,7 @@ const char *opt_debug_info_file;
 
 void deleteAllList()
 {
-	btctSymbol *current_btct, *btct_tmp;
 	brpSymbol *current_brp, *brp_tmp;
-
-	// free backTraceCacheTable
-	HASH_ITER(hh, btctab, current_btct, btct_tmp) {
-		HASH_DEL(btctab, current_btct);  /* delete it (users advances to next) */
-		free(current_btct->backtrace);
-		free(current_btct);             /* free it */
-	}
 
 	// free breakPointTable
 	HASH_ITER(hh, brptab, current_brp, brp_tmp) {
@@ -170,65 +153,6 @@ static void dump_regs(struct user const *regs, FILE *outfp)
     fprintf(outfp, "\n");
 }
 
-static void do_backtrace(pid_t child, long pc,int displayStackFrame) {
-
-	//printf("[%s] pc:%#lx",__func__, pc);
-	HASH_FIND_INT(btctab, &pc, btc);
-	if(btc)
-	{
-		if(displayStackFrame==1)
-		{
-			printf("[cache] RA:%#lx",btc->return_addr);
-			printf("[cache] BT:%s",btc->backtrace);
-		}
-		return;
-	}else{
-		ui = _UPT_create(child);
-		if (!ui) {
-			printf("_UPT_create failed");
-		}
-
-		unw_cursor_t c;
-		int backTaceLevel = 0;
-		int rc = unw_init_remote(&c, as, ui);
-		if (rc != 0) {
-			printf("unw_init_remote: %s", unw_strerror(rc));
-		}
-
-		if(displayStackFrame==1)
-			printf("backtrace start");
-		
-		char backTraceRec[256];
-		char *cur = backTraceRec, * const end = backTraceRec + sizeof(backTraceRec);
-		memset(backTraceRec,0,sizeof(backTraceRec));
-		do {
-			unw_word_t  offset, pc;
-			char fname[64];
-			unw_get_reg(&c, UNW_REG_IP, &pc);
-			fname[0] = '\0';
-			(void) unw_get_proc_name(&c, fname, sizeof(fname), &offset);
-			if(displayStackFrame==1)
-				printf("%p(%#lx) : (%s+0x%x)\n", (void *)pc, ptrace(PTRACE_PEEKTEXT, child, pc),fname, (int) offset);
-			if (cur < end) {
-				cur += snprintf(cur, end-cur, "\n%p:(%s+0x%x)\n", (void *)pc, fname, (int) offset);
-			}
-			backTaceLevel++;
-		} while ((unw_step(&c) > 0) && (backTaceLevel < BACKTRACE_MAX));
-		if(displayStackFrame==1)
-			printf("backtrace end\n");
-
-		// do cache
-		if(pc!=0)
-		{
-			btc = (btctSymbol*)malloc(sizeof(btctSymbol));
-			btc->return_addr = pc;
-			btc->backtrace = strdup(backTraceRec);
-			HASH_ADD_INT(btctab, return_addr, btc);
-		}
-		_UPT_destroy(ui);
-	}
-}
-
 static void signal_handler(int signo)
 {
 	printf("send SIGINT signal\n");
@@ -268,14 +192,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 	g_child = fork();
 
-    // setup libunwind
-	as = unw_create_addr_space(&_UPT_accessors, 0);
-	if (!as) {
-		printf("unw_create_addr_space failed");
-		exit(-1);
-	}
-	unw_set_caching_policy(as, UNW_CACHE_GLOBAL);
-
+	backtrace_init();
 	if (!g_child) {
 		ptrace(PTRACE_TRACEME, g_child,0,0);
 		execve(path, argv, envp);
@@ -389,8 +306,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 								}
 							}
 							//printf("[%d] caller: %s, ret=%#lx, argv1=%#lx, argv2=%#lx", new_child, bp->name, regs.regs.ARM_r0, brp->arg1, brp->arg2);
-                    		do_backtrace(new_child, 0, 1);
-							if (bp->handler(regs.regs.ARM_r0, brp->arg1, brp->arg2) != 0) {
+                    		//do_backtrace(new_child, 0, 1);
+							if (bp->handler(new_child, regs.regs.ARM_r0, brp->arg1, brp->arg2) != 0) {
 								printf("\n== Not enough memory.");
 								break;
 							}
@@ -480,9 +397,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 	}
 
 	breakpoint_cleanup(g_child);
-	unw_destroy_addr_space(as);
 	deleteAllList();
 	memblock_dump();
+	backtrace_deinit();
 	printf("memtrace exit");
 	return 0;
 }

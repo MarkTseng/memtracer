@@ -4,7 +4,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+// libunwind header
+#include <libunwind.h>
+#include <libunwind-arm.h>
+#include <libunwind-ptrace.h>
+// ptrace header
+#include <sys/ptrace.h>
+#include <asm/ptrace.h>
+#include <sys/user.h>
 
+#include "uthash.h"
 #include "ptrace_utils.h"
 typedef struct user_regs_struct registers_info_t;
 #define REG_RAX(ri) (ri).rax
@@ -12,6 +21,16 @@ typedef struct user_regs_struct registers_info_t;
 #define REG_RSI(ri) (ri).rsi
 #define REG_RDI(ri) (ri).rdi
 #define REG_RSP(ri) (ri).rsp
+
+typedef struct{
+    long return_addr; 
+	char *backtrace;
+    UT_hash_handle hh; /*uthash handle*/
+}backTraceCacheTable, btctSymbol;
+backTraceCacheTable *btctab=NULL, *btc;
+#define BACKTRACE_MAX (10)
+unw_addr_space_t as;
+struct UPT_info *ui;
 
 /* isintbreakpoint checks the supplied int to see if it contains a trap instruction */
 int isintbreakpoint(int trapint, int lsb)
@@ -250,3 +269,93 @@ void ptrace_detach(pid_t pid, int signum)
 {
 	ptrace(PTRACE_DETACH, pid, 0, signum);
 }
+
+void backtrace_init()
+{
+    as = unw_create_addr_space(&_UPT_accessors, 0);
+    if (!as) {
+        printf("unw_create_addr_space failed");
+        exit(-1);
+    }
+    unw_set_caching_policy(as, UNW_CACHE_GLOBAL); 
+}
+
+void backtrace_deinit()
+{
+    unw_destroy_addr_space(as);
+    deleteCacheList();
+}
+
+void do_backtrace(pid_t child, long pc,int displayStackFrame) 
+{
+
+	//printf("[%s] pc:%#lx",__func__, pc);
+	HASH_FIND_INT(btctab, &pc, btc);
+	if(btc)
+	{
+		if(displayStackFrame==1)
+		{
+			printf("[cache] RA:%#lx",btc->return_addr);
+			printf("[cache] BT:%s",btc->backtrace);
+		}
+		return;
+	}else{
+		ui = _UPT_create(child);
+		if (!ui) {
+			printf("_UPT_create failed");
+		}
+
+		unw_cursor_t c;
+		int backTaceLevel = 0;
+		int rc = unw_init_remote(&c, as, ui);
+		if (rc != 0) {
+			printf("unw_init_remote: %s", unw_strerror(rc));
+		}
+
+		if(displayStackFrame==1)
+			printf("backtrace start");
+		
+		char backTraceRec[256];
+		char *cur = backTraceRec, * const end = backTraceRec + sizeof(backTraceRec);
+		memset(backTraceRec,0,sizeof(backTraceRec));
+		do {
+			unw_word_t  offset, pc;
+			char fname[64];
+			unw_get_reg(&c, UNW_REG_IP, &pc);
+			fname[0] = '\0';
+			(void) unw_get_proc_name(&c, fname, sizeof(fname), &offset);
+			if(displayStackFrame==1)
+				printf("%p(%#lx) : (%s+0x%x)\n", (void *)pc, ptrace(PTRACE_PEEKTEXT, child, pc),fname, (int) offset);
+			if (cur < end) {
+				cur += snprintf(cur, end-cur, "\n%p:(%s+0x%x)\n", (void *)pc, fname, (int) offset);
+			}
+			backTaceLevel++;
+		} while ((unw_step(&c) > 0) && (backTaceLevel < BACKTRACE_MAX));
+		if(displayStackFrame==1)
+			printf("backtrace end\n");
+
+		// do cache
+		if(pc!=0)
+		{
+			btc = (btctSymbol*)malloc(sizeof(btctSymbol));
+			btc->return_addr = pc;
+			btc->backtrace = strdup(backTraceRec);
+			HASH_ADD_INT(btctab, return_addr, btc);
+		}
+		_UPT_destroy(ui);
+	}
+}
+
+void deleteCacheList()
+{
+	btctSymbol *current_btct, *btct_tmp;
+
+	// free backTraceCacheTable
+	HASH_ITER(hh, btctab, current_btct, btct_tmp) {
+		HASH_DEL(btctab, current_btct);  /* delete it (users advances to next) */
+		free(current_btct->backtrace);
+		free(current_btct);             /* free it */
+	}
+}
+
+

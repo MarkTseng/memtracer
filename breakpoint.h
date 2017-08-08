@@ -4,7 +4,7 @@
 #include <sys/types.h>
 #include <stdint.h>
 
-typedef int (*bp_handler_f) (uintptr_t, uintptr_t, uintptr_t);
+typedef int (*bp_handler_f) (int pid, uintptr_t, uintptr_t, uintptr_t);
 
 struct breakpoint_s {
 	const char	*name;
