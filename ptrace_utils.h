@@ -1,10 +1,3 @@
-/*
- * swappers of ptrace, on GNU/Linux and FreeBSD
- *
- * Author: Wu Bingzheng
- *   Date: 2016-5
- */
-
 #ifndef MLD_PTRACE_UTILS_H
 #define MLD_PTRACE_UTILS_H
 

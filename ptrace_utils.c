@@ -1,10 +1,3 @@
-/*
- * swappers of ptrace, on GNU/Linux and FreeBSD
- *
- * Author: Wu Bingzheng
- *   Date: 2016-5
- */
-
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdlib.h>

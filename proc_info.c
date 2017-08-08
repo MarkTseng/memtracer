@@ -1,10 +1,3 @@
-/*
- * read process information, on GNU/Linux and FreeBSD
- *
- * Author: Wu Bingzheng
- *   Date: 2016-5
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

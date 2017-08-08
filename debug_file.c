@@ -1,10 +1,3 @@
-/*
- * try and validate debug-info files
- *
- * Author: Wu Bingzheng
- *   Date: 2016-6
- */
-
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <fcntl.h>
