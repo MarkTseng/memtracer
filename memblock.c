@@ -37,7 +37,6 @@ int memblock_new(uintptr_t pointer, size_t size)
 	return 0;
 }
 
-#define DONOT_SHOW_AFTER_FREE_EXPIRES 3
 void memblock_delete(struct memblock_s *mb)
 {
 	if (mb == NULL) {

@@ -31,6 +31,7 @@
 #include "hash.h"
 #include "ptrace_utils.h"
 #include "memblock.h"
+#include "breakblock.h"
 
 // global variable
 pid_t g_child;
@@ -53,8 +54,8 @@ typedef struct{
     long return_opc;   
     long entry_addr; 
     long entry_opc; 
-	uintptr_t arg1;
-	uintptr_t arg2;
+	long arg1;
+	long arg2;
 	int pid;
     UT_hash_handle hh; /*uthash handle*/
 }breakPointTable, brpSymbol;
@@ -256,7 +257,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 						/* set breakpoint at return address */
 						breaktrap1 = setbreakpoint(new_child, regs.regs.ARM_lr);
-						printf("[%d] function entry: symbol = %s, g_entryCnt=%d, argv1:%#lx, argv2:%#lx", new_child, bp->name, g_entryCnt, regs.regs.ARM_r0, regs.regs.ARM_r1);
+						printf("[%d] function_entry: symbol = %s, RA:%#lx, g_entryCnt=%d, argv1:%#lx, argv2:%#lx", new_child, bp->name, regs.regs.ARM_lr, g_entryCnt, regs.regs.ARM_r0, regs.regs.ARM_r1);
 						brp = (brpSymbol*)malloc(sizeof(brpSymbol));
 						brp->return_addr = regs.regs.ARM_lr;
 						brp->return_opc = breaktrap1;
@@ -264,7 +265,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						brp->entry_opc = bp->entry_code;
 						brp->arg1 = regs.regs.ARM_r0;
 						brp->arg2 = regs.regs.ARM_r1;
+						brp->pid = new_child;
 						HASH_ADD_INT(brptab, return_addr, brp);
+						breakblock_new(regs.regs.ARM_lr, breaktrap1, bp->entry_address, bp->entry_code, regs.regs.ARM_r0, regs.regs.ARM_r1, new_child);
 
 						if(strcmp("dlopen", bp->name) == 0)
 						{
@@ -273,6 +276,16 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							printf("call dlopen: %s ", dlname);
 						}
 					} else {
+						struct breakblock_s *bb = NULL;
+						printf("[%d] PC:%#lx", new_child, pc);
+						bb = breakblock_search(pc, new_child);
+						if(bb)
+						{
+							breakblock_show(bb);
+							breakblock_delete(bb);
+						} else {
+							printf("no fount breakblock list\n");
+						}
 						HASH_FIND_INT(brptab, &pc, brp);
 						if(brp){
 							g_entryCnt--;
@@ -296,7 +309,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 									}
 								}
 							}
-							printf("[%d] function return: symbol:%s, ret=%#lx, argv1=%#lx, argv2=%#lx", new_child, bp->name, regs.regs.ARM_r0, brp->arg1, brp->arg2);
+							printf("[%d] function_return: symbol:%s, RA:%#lx, ret=%#lx, argv1=%#lx, argv2=%#lx, pid:%d", new_child, bp->name, brp->return_addr, regs.regs.ARM_r0, brp->arg1, brp->arg2, brp->pid);
                     		//do_backtrace(new_child, 0, 1);
 							if (bp->handler(new_child, regs.regs.ARM_r0, brp->arg1, brp->arg2) != 0) {
 								printf("\n== Not enough memory.");
@@ -391,6 +404,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 	deleteAllList();
 	memblock_dump();
 	backtrace_deinit();
+	breakblock_dump();
 	printf("memtrace exit");
 	return 0;
 }

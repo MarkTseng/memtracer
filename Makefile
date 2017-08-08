@@ -11,8 +11,8 @@ TARGET = memtrace
 TARGET2 = test
 TARGET3 = elf_parser
 
-SOURCES = breakpoint.c debug_file.c debug_line.c proc_info.c symtab.c ptrace_utils.c memblock.c
-OBJS = breakpoint.o debug_file.o debug_line.o proc_info.o symtab.o ptrace_utils.o memblock.o
+SOURCES = breakpoint.c debug_file.c debug_line.c proc_info.c symtab.c ptrace_utils.c memblock.c breakblock.c
+OBJS = breakpoint.o debug_file.o debug_line.o proc_info.o symtab.o ptrace_utils.o memblock.o breakblock.o
 
 all: $(TARGET) $(TARGET2) $(TARGET3) 
 
@@ -47,3 +47,4 @@ proc_info.o: proc_info.c proc_info.h
 symtab.o: symtab.c array.h minigdb.h proc_info.h debug_file.h
 ptrace_utils.o: ptrace_utils.c ptrace_utils.h
 memblock.o: memblock.c memblock.h
+breakblock.o: breakblock.c breakblock.h
