@@ -1,6 +1,6 @@
-CFLAGS =  -DMLX_WITH_LIBDW -I/home/mark/myResearch/elfutils-0.165/ARM_LIBS/include/elfutils -I/home/mark/myResearch/elfutils-0.165/ARM_LIBS/include -g -O2 -Wall -I/home/mark/myResearch/libunwind/LIBUNWIND_ARM/include 
+CFLAGS =  -DMLX_WITH_LIBDW -I/home/mark/myResearch/elfutils-0.165/ARM_LIBS/include/elfutils -I/home/mark/myResearch/elfutils-0.165/ARM_LIBS/include -g -Wall -I/home/mark/myResearch/libunwind/LIBUNWIND_ARM/include 
 LDLIBS =  -L/home/mark/myResearch/libunwind/LIBUNWIND_ARM/lib -L/home/mark/myResearch/elfutils-0.165/ARM_LIBS/lib -L/home/mark/myResearch/elfutils-0.165/ARM_LIBS/lib/elfutils -L/home/mark/nfs/ARM_LIBS/lib -lunwind-ptrace -lunwind -lunwind-arm -ldw -lelf -lz -pthread 
-#CFLAGS =  -DRPI -DMLX_WITH_LIBDW -I/usr/include/elfutils/ -g -O2 -Wall 
+#CFLAGS =  -DRPI -DMLX_WITH_LIBDW -I/usr/include/elfutils/ -g -Wall 
 #LDLIBS =  -lunwind-ptrace -lunwind -lunwind-arm -ldw -lelf -lz -pthread 
 LDFLAGS = 
 PREFIX = /usr

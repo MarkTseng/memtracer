@@ -65,9 +65,6 @@ int symtot = 0;
 unsigned long main_addr = 0;
 long main_orig_opc = 0;
 
-// memleax for compile use
-#define BACKTRACE_MAX (10)
-int opt_backtrace_limit = BACKTRACE_MAX;
 const char *opt_debug_info_file;
 
 void deleteAllList()
@@ -216,11 +213,19 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 		ptrace(PTRACE_CONT,new_child, NULL, NULL);
         /* trace pid */
 		while(1) {
-            new_child = waitpid(-1, &status, __WALL);
+            new_child = waitpid(-1, &status, __WALL|WUNTRACED);
+
+			if (new_child < 0) {
+				if (errno == EINTR) {
+					continue;
+				}
+				perror("\n== Error on waitpid()");
+				break;
+			}
+
 			// set all breakpoint
 			if((g_readelf == 0) && (new_child == g_child))
 			{
-				//printf("pid:%d, load symbol table, sig:%d", new_child, WSTOPSIG(status));
 				symtab_build(g_child);
 				breakpoint_init(g_child);
 				clearbreakpoint(g_child, main_addr, main_orig_opc);
@@ -234,17 +239,12 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			sig = WSTOPSIG(status);
             //dump_regs(&regs, stdout);
             //printf("[wait] status:%#x , sig:%d, pid:%d ", status, WSTOPSIG(status), new_child);
-			if(new_child == -1)
-				break;
 #ifndef RPI
 			long pc =  regs.regs.ARM_pc + 1;
 #else
 			long pc =  regs.regs.ARM_pc;
 #endif
-			//printf("pc:%#lx", pc);
-			//dumpAllBrkList(new_child);
             if (WIFSTOPPED(status)) {
-                //printf("[WIFSTOPPED] status:%#x , sig:%d, pid:%d ", status, WSTOPSIG(status), new_child);
 				if(WSTOPSIG(status)== SIGILL)
                 {  
 					if ((bp = breakpoint_by_entry(pc)) != NULL)
@@ -253,12 +253,10 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						g_entryCnt++;
 						/* recover entry code */
 						clearbreakpoint(new_child, bp->entry_address, bp->entry_code);
-						//YELLOWprintf("pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
 
 						/* set breakpoint at return address */
 						breaktrap1 = setbreakpoint(new_child, regs.regs.ARM_lr);
-						//printf("RA brp set:%#lx", regs.regs.ARM_lr);
-						//printf("[pid: %d] function entry: symbol = %s, address:%#x, g_entryCnt=%d, RA:%#lx", new_child, bp->name, bp->entry_address, g_entryCnt, regs.regs.ARM_lr);
+						printf("[%d] function entry: symbol = %s, g_entryCnt=%d, argv1:%#lx, argv2:%#lx", new_child, bp->name, g_entryCnt, regs.regs.ARM_r0, regs.regs.ARM_r1);
 						brp = (brpSymbol*)malloc(sizeof(brpSymbol));
 						brp->return_addr = regs.regs.ARM_lr;
 						brp->return_opc = breaktrap1;
@@ -274,21 +272,14 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							getdata(new_child, brp->arg1, dlname, 32);
 							printf("call dlopen: %s ", dlname);
 						}
-						//dump_regs(&regs, stdout);
 					} else {
-						//pc+=1;
-						//printf("pc in RA:%#lx", pc);
 						HASH_FIND_INT(brptab, &pc, brp);
 						if(brp){
-							//dump_regs(&regs, stdout);
 							g_entryCnt--;
 							/* -- at function return */
-							//YELLOWprintf("function return address: %#lx", brp->return_addr);
 							clearbreakpoint(new_child, brp->return_addr, brp->return_opc);
 							bp = breakpoint_by_entry( brp->entry_addr);
-							//printf("calle%s, R%#lx", bp->name, brp->return_addr);
 							do_backtrace(new_child, brp->return_addr,0);
-							//callstack_print(callstack_current());
 							if(strcmp("dlopen", bp->name) == 0)
 							{
 								int i;
@@ -305,7 +296,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 									}
 								}
 							}
-							//printf("[%d] caller: %s, ret=%#lx, argv1=%#lx, argv2=%#lx", new_child, bp->name, regs.regs.ARM_r0, brp->arg1, brp->arg2);
+							printf("[%d] function return: symbol:%s, ret=%#lx, argv1=%#lx, argv2=%#lx", new_child, bp->name, regs.regs.ARM_r0, brp->arg1, brp->arg2);
                     		//do_backtrace(new_child, 0, 1);
 							if (bp->handler(new_child, regs.regs.ARM_r0, brp->arg1, brp->arg2) != 0) {
 								printf("\n== Not enough memory.");
@@ -318,7 +309,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							HASH_DEL(brptab, brp);
 							free(brp);
 						}else{
-							//YELLOWprintf("WARNG: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
+							YELLOWprintf("WARNG: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
 							//dumpAllBrkList(new_child);
 							//dump_regs(&regs, stdout);
                     		//do_backtrace(new_child, 0, 1);

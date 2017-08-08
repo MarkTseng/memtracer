@@ -8,41 +8,41 @@
 #include "symtab.h"
 #include "minigdb.h"
 #include "memblock.h"
-#define MAX_BREAKPINT_NUM (7)
+#define MAX_BREAKPINT_NUM (11)
 struct breakpoint_s g_breakpoints[MAX_BREAKPINT_NUM];
-
 static int bph_malloc(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
-	//log_debug("-- malloc pointer:%lx, size: %#lx\n", pointer, size);
+	log_debug("[%d] malloc pointer:%#lx, size: %#lx\n", pid, pointer, size);
 	memblock_new(pointer, size);
+   	//do_backtrace(pid, 0, 1);
 	return 0;
 }
 
-#if 0
+#if 1
 static int bph_new(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
-	//log_debug("-- new size:%ld ret:%lx\n", size, pointer);
+	log_debug("[%d] new pointer:%#lx size:%ld\n", pid, pointer, size);
 
 	return 0;
 }
 
 static int bph_newa(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
-	//log_debug("-- newa size:%ld ret:%lx\n", size, pointer);
+	log_debug("[%d] newa pointer:%#lx size:%ld\n", pid, pointer, size);
 
 	return 0;
 }
 
 static int bph_delete(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	//log_debug("-- delete point:%lx\n", pointer);
+	log_debug("[%d] delete pointer:%#lx\n", pid, pointer);
 
 	return 0;
 }
 
 static int bph_deletea(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	//log_debug("-- deletea point:%lx\n", pointer);
+	log_debug("[%d] deletea pointer:%#lx\n", pid, pointer);
 
 	return 0;
 }
@@ -50,26 +50,33 @@ static int bph_deletea(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t no
 
 static int bph_dlopen(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	//log_debug("-- dlopen ret:%#x, p1:%#x, p2:%#x\n", none1, pointer, none2);
+	//log_debug("[%d] dlopen ret:%#x, p1:%#x, p2:%#x\n", pid, none1, pointer, none2);
 
 	return 0;
 }
 
 static int bph_free(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	//log_debug("-- free point:%lx\n", pointer);
+	log_debug("[%d] free point:%#lx\n", pid, pointer);
 	if(memblock_search(pointer)==NULL)
 	{	
-		log_debug("-- free point:%lx\n", pointer);
     	do_backtrace(pid, 0, 1);
 	}
 	memblock_delete(memblock_search(pointer));
 	return 0;
 }
 
+static int bph_backtrace(int pid, uintptr_t ret, uintptr_t arg1, uintptr_t arg2)
+{
+	log_debug("[%d] backtrace: ret:%lx, arg1:%#x, arg2:%#x \n", pid, ret, arg1, arg2);
+    do_backtrace(pid, 0, 1);
+	return 0;
+}
+
+
 static int bph_realloc(int pid, uintptr_t new_pointer, uintptr_t old_pointer, uintptr_t size)
 {
-	//log_debug("-- realloc pointer:%lx->%lx size:%ld\n", old_pointer, new_pointer, size);
+	log_debug("[%d] realloc pointer:%#lx->%#lx size:%ld\n", pid, old_pointer, new_pointer, size);
     if (new_pointer == old_pointer) {
         memblock_update_size(memblock_search(old_pointer), size);
     } else {
@@ -82,21 +89,22 @@ static int bph_realloc(int pid, uintptr_t new_pointer, uintptr_t old_pointer, ui
 
 static int bph_calloc(int pid, uintptr_t pointer, uintptr_t nmemb, uintptr_t size)
 {
-	//log_debug("-- calloc pointer:%lx nmemb:%ld size:%ld\n", pointer, nmemb, size);
+	log_debug("[%d] calloc pointer:%#lx nmemb:%ld size:%ld\n", pid, pointer, nmemb, size);
 	memblock_new(pointer, nmemb * size);
+   	do_backtrace(pid, 0, 1);
 	return 0;
 }
 
 static int bph_mmap(int pid, uintptr_t ret_map_addr, uintptr_t none1, uintptr_t length)
 {
-	log_debug("-- mmap addr:%#x, length:%#x", ret_map_addr, length);
+	log_debug("[%d] mmap addr:%#x, length:%#x", pid, ret_map_addr, length);
 
 	return 0;
 }
 
 static int bph_munmap(int pid, uintptr_t none1, uintptr_t unmap_addr, uintptr_t length)
 {
-	log_debug("-- munmap addr:%#x, length:%#x", unmap_addr, length);
+	log_debug("[%d] munmap addr:%#x, length:%#x", pid, unmap_addr, length);
 
 	return 0;
 }
@@ -130,7 +138,8 @@ void breakpoint_init(pid_t pid)
 	do_breakpoint_init(pid, &g_breakpoints[4], "dlopen", bph_dlopen);
 	do_breakpoint_init(pid, &g_breakpoints[5], "mmap", bph_mmap);
 	do_breakpoint_init(pid, &g_breakpoints[6], "munmap", bph_munmap);
-#if 0
+	//do_breakpoint_init(pid, &g_breakpoints[7], "__libc_thread_freeres", bph_backtrace);
+#if 1
 	do_breakpoint_init(pid, &g_breakpoints[7], "_Znwj", bph_new);
 	do_breakpoint_init(pid, &g_breakpoints[8], "_Znaj", bph_newa);
 	do_breakpoint_init(pid, &g_breakpoints[9], "_ZdlPv", bph_delete);

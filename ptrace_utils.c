@@ -54,7 +54,6 @@ unsigned long readchildword(pid_t pid, unsigned long addr)
 	if (word == -1) {
 		if (errno) {
 			printf( "readchildword ptrace_peektext error: %s", strerror(errno));
-			exit(E_PTRACE);
 		}
 	}
 
@@ -71,14 +70,12 @@ void writechildword(pid_t pid, unsigned long addr, unsigned long word)
 	/* write word to child process */
 	if (ptrace(PTRACE_POKETEXT, pid, addr, word)) {
 		printf( "writechildword ptrace_poketext error: %s", strerror(errno));
-		exit(E_PTRACE);
 	}
 
 	check = readchildword(pid, addr);
 
 	if (check != word) {
 		printf( "writechildword word not written error");
-		exit(E_PTRACE);
 	}
 
 	//printf("[%s] wrote 0x%08lx to addr:0x%#lx\n", __func__, word, addr);
@@ -109,7 +106,6 @@ unsigned int setbreakpoint(pid_t exe, unsigned long breakaddr)
 
 	if ((!thumb) && (addr & 0x2)) {
 		printf( "setbreakpoint: arm, address misalignment, 0x%lx", addr);
-		exit(E_UNKNOWN);
 	}
 
 	if (thumb) {
@@ -174,7 +170,6 @@ void clearbreakpoint(pid_t exe, unsigned long breakaddr, unsigned int origint)
 
 	if ((!thumb) && (addr & 0x2)) {
 		printf( "clearbreakpoint: arm, address misalignment, 0x%lx", addr);
-		exit(E_UNKNOWN);
 	}
 
 	if (thumb) {
