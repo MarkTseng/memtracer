@@ -5,17 +5,6 @@
 #include "list.h"
 #include "breakblock.h"
 
-struct breakblock_s {
-	struct list_head	list_node;
-    long return_addr; 
-    long return_opc;   
-    long entry_addr; 
-    long entry_opc; 
-	long arg1;
-	long arg2;
-    int  pid;
-};
-
 
 static LIST_HEAD(g_breakblock_active);
 
@@ -39,6 +28,8 @@ int breakblock_new(long return_addr, long return_opc, long entry_addr, long entr
     bb->pid = pid;
 	list_add_tail(&bb->list_node, &g_breakblock_active);
 
+    breakblock_dump();
+    printf("\n\n");
 	return 0;
 }
 
@@ -59,11 +50,14 @@ struct breakblock_s *breakblock_search(uintptr_t return_addr, int pid)
 
 	list_for_each(p, &g_breakblock_active) {
 		bb = list_entry(p, struct breakblock_s, list_node);
-        if( (return_addr == bb->return_addr)&&(pid == bb->pid))
+        //if( (return_addr == bb->return_addr)&&(pid == bb->pid))
+        if((return_addr == bb->return_addr))
         {
             return bb;
         }
 	}
+    //printf("not found ");
+    //breakblock_dump();
     return NULL;
 }
 
@@ -74,7 +68,7 @@ void breakblock_dump(void)
 
 	list_for_each(p, &g_breakblock_active) {
 		bb = list_entry(p, struct breakblock_s, list_node);
-        printf("return_addr:%#lx, pid:%d\n", bb->return_addr, bb->pid);
+        printf("return_addr:%#lx, entry_addr: %#lx, pid:%d\n", bb->return_addr, bb->entry_addr, bb->pid);
 	}
 }
 

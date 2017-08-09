@@ -308,7 +308,7 @@ void do_backtrace(pid_t child, long pc,int displayStackFrame)
 		}
 
 		if(displayStackFrame==1)
-			printf("backtrace start");
+			printf("backtrace start\n");
 		
 		char backTraceRec[256];
 		char *cur = backTraceRec, * const end = backTraceRec + sizeof(backTraceRec);

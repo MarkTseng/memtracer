@@ -57,6 +57,8 @@ void memblock_update_size(struct memblock_s *mb, size_t size)
 
 struct memblock_s *memblock_search(uintptr_t pointer)
 {
+    if(pointer == 0)
+        return NULL;
 	struct hlist_node *p = hash_search(g_memblock_hash,
 			&pointer, sizeof(uintptr_t));
 	if (p == NULL) {
