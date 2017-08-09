@@ -6,10 +6,10 @@
 
 struct memblock_s;
 
-int memblock_new(uintptr_t pointer, size_t size);
+int memblock_new(long pointer, size_t size, int pid);
 void memblock_delete(struct memblock_s *mb);
 void memblock_update_size(struct memblock_s *mb, size_t size);
-struct memblock_s *memblock_search(uintptr_t pointer);
-void memblock_dump(void);
+struct memblock_s *memblock_search(long pointer);
+void memblock_dump(int freeall);
 
 #endif

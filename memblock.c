@@ -2,22 +2,19 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "hash.h"
 #include "list.h"
 #include "memblock.h"
 
 struct memblock_s {
 	struct list_head	list_node;
-	struct hlist_node	hash_node;
-	uintptr_t		pointer;
-	size_t			size;
+	long		pointer;
+	size_t		size;
+    int         pid;
 };
-
-static struct hlist_head g_memblock_hash[HASH_SIZE];
 
 static LIST_HEAD(g_memblock_active);
 
-int memblock_new(uintptr_t pointer, size_t size)
+int memblock_new(long pointer, size_t size, int pid)
 {
 	if (pointer == 0) {
 		printf("Warning: alloc returns NULL at\n");
@@ -30,8 +27,8 @@ int memblock_new(uintptr_t pointer, size_t size)
 	}
 	mb->pointer = pointer;
 	mb->size = size;
+	mb->pid = pid;
 
-	hash_add(g_memblock_hash, &mb->hash_node, sizeof(uintptr_t));
 	list_add_tail(&mb->list_node, &g_memblock_active);
 
 	return 0;
@@ -43,7 +40,6 @@ void memblock_delete(struct memblock_s *mb)
 		return;
 	}
 
-	hash_delete(&mb->hash_node);
 	list_del(&mb->list_node);
 	free(mb);
 }
@@ -55,26 +51,44 @@ void memblock_update_size(struct memblock_s *mb, size_t size)
 	}
 }
 
-struct memblock_s *memblock_search(uintptr_t pointer)
-{
-    if(pointer == 0)
-        return NULL;
-	struct hlist_node *p = hash_search(g_memblock_hash,
-			&pointer, sizeof(uintptr_t));
-	if (p == NULL) {
-        printf("No fount pointer: %#lx\n", pointer);
-		return NULL;
-	}
-	return list_entry(p, struct memblock_s, hash_node);
-}
-
-void memblock_dump(void)
+struct memblock_s *memblock_search(long pointer)
 {
 	struct list_head *p;
 	struct memblock_s *mb;
+    if(pointer == 0)
+        return NULL;
 
-	list_for_each(p, &g_memblock_active) {
+   	list_for_each(p, &g_memblock_active) {
 		mb = list_entry(p, struct memblock_s, list_node);
-        printf("pointer:%#lx, size:%#lx\n", mb->pointer, mb->size);
+        //if( (return_addr == mb->pointer)&&(pid == mb->pid))
+        if((pointer == mb->pointer))
+        {
+            return mb;
+        }
 	}
+
+	return NULL;
+}
+
+void memblock_dump(int freeall)
+{
+	struct list_head *p,*q;
+	struct memblock_s *mb;
+    
+    if(freeall == 0)
+	{
+        list_for_each(p, &g_memblock_active) {
+	    	mb = list_entry(p, struct memblock_s, list_node);
+            printf("[%d] pointer:%#lx, size:%#lx\n", mb->pid, mb->pointer, mb->size);
+	    }
+    }
+
+    if(freeall == 1)
+	{
+        list_for_each_safe(p,q,&g_memblock_active) {
+	    	mb = list_entry(p, struct memblock_s, list_node);
+            printf("[%d] pointer:%#lx, size:%#lx\n", mb->pid, mb->pointer, mb->size);
+            memblock_delete(mb);
+	    }
+    }
 }

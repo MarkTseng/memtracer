@@ -40,8 +40,8 @@ struct user regs;
 static int g_readelf = 0;
 struct breakpoint_s *bp = NULL;
 uintptr_t return_address = 0, return_code = 0;
-unsigned long breaktrap1 = 0;
-unsigned long breaktrap2 = 0;
+unsigned long int breaktrap1 = 0;
+unsigned long int breaktrap2 = 0;
 int sig = 0;
 int ptrace_event = 0;
 int g_entryCnt = 0;
@@ -50,12 +50,12 @@ char dlname[128];
 char pidName[32];
 
 typedef struct{
-    long return_addr; 
-    long return_opc;   
-    long entry_addr; 
-    long entry_opc; 
-	long arg1;
-	long arg2;
+    unsigned long int return_addr; 
+    unsigned long int return_opc;   
+    unsigned long int entry_addr; 
+    unsigned long int entry_opc; 
+	unsigned long int arg1;
+	unsigned long int arg2;
 	int pid;
     UT_hash_handle hh; /*uthash handle*/
 }breakPointTable, brpSymbol;
@@ -63,8 +63,8 @@ breakPointTable *brptab=NULL, *brp;
 
 struct symbol *symbols = NULL;
 int symtot = 0;
-unsigned long main_addr = 0;
-long main_orig_opc = 0;
+unsigned long int main_addr = 0;
+unsigned long int main_orig_opc = 0;
 
 const char *opt_debug_info_file;
 
@@ -241,9 +241,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
             //dump_regs(&regs, stdout);
             //printf("[wait] status:%#x , sig:%d, pid:%d ", status, WSTOPSIG(status), new_child);
 #ifndef RPI
-			long pc =  regs.regs.ARM_pc + 1;
+			unsigned long int pc =  regs.regs.ARM_pc + 1;
 #else
-			long pc =  regs.regs.ARM_pc;
+			unsigned long int pc =  regs.regs.ARM_pc;
 #endif
             if (WIFSTOPPED(status)) {
 
@@ -283,8 +283,6 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					//printf("[%d] PC:%#lx", new_child, pc);
 					if ((bp = breakpoint_by_entry(pc)) != NULL)
 					{
-						//printf("pc in brp:%#lx", pc);
-						g_entryCnt++;
 						/* recover entry code */
 						clearbreakpoint(new_child, bp->entry_address, bp->entry_code);
 
@@ -304,8 +302,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 #endif
 						breakblock_new(regs.regs.ARM_lr, breaktrap1, bp->entry_address, bp->entry_code, regs.regs.ARM_r0, regs.regs.ARM_r1, new_child);
 
-#if 0
-						long arg1 = regs.regs.ARM_r0;
+#if 1
+						unsigned long int arg1 = regs.regs.ARM_r0;
 						if(strcmp("dlopen", bp->name) == 0)
 						{
 							memset(dlname,0,sizeof(dlname));
@@ -313,17 +311,17 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							printf("call dlopen: %s ", dlname);
 						}
 #endif
+						g_entryCnt++;
 					} else {
 						struct breakblock_s *bb = NULL;
 						bb = breakblock_search(pc, new_child);
 						if(bb!=NULL)
 						{
-							//breakblock_show(bb);
-							g_entryCnt--;
 							/* -- at function return */
 							clearbreakpoint(new_child, bb->return_addr, bb->return_opc);
 							bp = breakpoint_by_entry(bb->entry_addr);
-							do_backtrace(new_child, bb->return_addr,0);
+							//do_backtrace(new_child, pc,0);
+#if 0
 							if(strcmp("dlopen", bp->name) == 0)
 							{
 								int i;
@@ -340,23 +338,25 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 									}
 								}
 							}
+#endif
 							//printf("[%d] function_return: symbol:%s, RA:%#lx, ret=%#lx, argv1=%#lx, argv2=%#lx, pid:%d", new_child, bp->name, bb->return_addr, regs.regs.ARM_r0, bb->arg1, bb->arg2, bb->pid);
-                    		//do_backtrace(new_child, 0, 1);
-							if (bp->handler(new_child, regs.regs.ARM_r0, bb->arg1, bb->arg2) != 0) {
-								printf("\n== Not enough memory.");
-								break;
+							if(bp)
+							{
+								bp->handler(new_child, regs.regs.ARM_r0, bb->arg1, bb->arg2);
+							}else{
+								YELLOWprintf("WARN: Can not found bp: pc:%#lx, g_entryCnt:%d, pid:%d in hashlist", pc, g_entryCnt, new_child);
 							}
 							
 							/*restore instruction(s)*/
-							//printf("recovery breakpoin entry_address:%#x", bb->entry_addr);
 							setbreakpoint(new_child, bb->entry_addr);
-
+							do_backtrace(new_child, pc,0);
 							breakblock_delete(bb);
+							g_entryCnt--;
 						} else {
-							YELLOWprintf("WARNG: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
+							YELLOWprintf("WARN: Can not found pc:%#lx, g_entryCnt:%d, pid:%d in hashlist", pc, g_entryCnt, new_child);
 							//dumpAllBrkList(new_child);
 							//dump_regs(&regs, stdout);
-    						breakblock_dump();
+    						breakblock_dump(0);
                     		do_backtrace(new_child, 0, 1);
 						}
 #if 0
@@ -396,7 +396,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							HASH_DEL(brptab, brp);
 							free(brp);
 						}else{
-							YELLOWprintf("WARNG: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
+							YELLOWprintf("WARN: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
 							//dumpAllBrkList(new_child);
 							//dump_regs(&regs, stdout);
                     		//do_backtrace(new_child, 0, 1);
@@ -478,9 +478,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 	breakpoint_cleanup(g_child);
 	deleteAllList();
-	memblock_dump();
+	memblock_dump(1);
 	backtrace_deinit();
-	breakblock_dump();
+	breakblock_dump(1);
 	printf("memtrace exit");
 	return 0;
 }
