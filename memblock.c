@@ -31,7 +31,7 @@ int memblock_new(long pointer, size_t size, int pid)
 	mb->pid = pid;
 
 	list_add_tail(&mb->list_node, &g_memblock_active);
-    //printf("[%s][%d] malloc pointer:%#lx, size:%#lx\n",__func__, pid, pointer, size);
+    //printf("[%s][%d] alloc pointer:%#lx, size:%#lx\n",__func__, mb->pid, mb->pointer, mb->size);
     addCnt++;
 	return 0;
 }
@@ -42,6 +42,7 @@ void memblock_delete(struct memblock_s *mb)
 		return;
 	}
 
+    //printf("[%s][%d] delete pointer:%#lx, size:%#lx\n",__func__, mb->pid, mb->pointer, mb->size);
 	list_del(&mb->list_node);
 	free(mb);
     delCnt++;
@@ -58,14 +59,15 @@ struct memblock_s *memblock_search(long pointer)
 {
 	struct list_head *p;
 	struct memblock_s *mb;
+    
     if(pointer == 0)
         return NULL;
 
    	list_for_each(p, &g_memblock_active) {
 		mb = list_entry(p, struct memblock_s, list_node);
-        //if( (return_addr == mb->pointer)&&(pid == mb->pid))
         if((pointer == mb->pointer))
         {
+            //printf("[%s][%d] pointer:%#lx, mb->pointer:%#lx, mb->size:%#lx\n",__func__, mb->pid, pointer, mb->pointer, mb->size);
             return mb;
         }
 	}

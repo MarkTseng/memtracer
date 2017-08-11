@@ -52,14 +52,6 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Error creating thread\n");
 			return 1;
 		}
-		/* wait for the second thread to finish */
-		if(pthread_join(inc_x_thread[i], NULL)) {
-
-			fprintf(stderr, "Error joining thread\n");
-			return 2;
-
-		}
-
         p1 = malloc(0xc);
         printf("[%s] p1:%p\n", __func__,p1);
         p2 = malloc(0xc);
@@ -85,5 +77,18 @@ int main(int argc, char **argv)
 		free(p1);
         i++;
     }
+
+	for(i=0;i<5;i++)
+	{
+	/* wait for the second thread to finish */
+	if(pthread_join(inc_x_thread[i], NULL)) {
+
+		fprintf(stderr, "Error joining thread\n");
+		return 2;
+
+	}
+	}
+
+
     return 0;
 }

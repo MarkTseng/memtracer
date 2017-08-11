@@ -48,10 +48,10 @@ static int bph_delete(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t non
    	//do_backtrace(pid, 0, 1);
 	if((memblock_search(pointer)==NULL))
 	{	
-		log_debug("[%d] not found free point:%#lx\n", pid, pointer);
+		log_debug("[%d] not found delete point:%#lx\n", pid, pointer);
 	}
 
-	if(pointer == NULL)
+	if((long)pointer == 0)
 		return 0;
 	memblock_delete(memblock_search(pointer));
 	delCnt1++;
@@ -65,10 +65,10 @@ static int bph_deletea(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t no
    	//do_backtrace(pid, 0, 1);
 	if((memblock_search(pointer)==NULL))
 	{	
-		log_debug("[%d] not found free point:%#lx\n", pid, pointer);
+		log_debug("[%d] not found deletea point:%#lx\n", pid, pointer);
 	}
 
-	if(pointer == NULL)
+	if((long)pointer == 0)
 		return 0;
 	memblock_delete(memblock_search(pointer));
 	delCnt1++;
@@ -87,13 +87,21 @@ static int bph_dlopen(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t non
 static int bph_free(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
 	//log_debug("[%d]free [%d] point:%#lx, ret:%#lx, arg2:%#lx", pid, delCnt1, pointer, none1, none2);
-	if((memblock_search(pointer)==NULL))
+	if((memblock_search(pointer)==NULL) && (pointer !=0))
 	{	
 		log_debug("[%d] not found free point:%#lx\n", pid, pointer);
+		//printf("[memblock_dump start]\n");
+		//memblock_dump(0);
+		//printf("[memblock_dump end]\n");
 	}
 
-	if(pointer == NULL)
+	if((long)pointer == 0)
+    {
+		//printf("[free pointer 0 start]\n");
+		//do_backtrace(pid, 0, 1);
+		//printf("[free pointer 0 end]\n");
 		return 0;
+	}
 	memblock_delete(memblock_search(pointer));
 	delCnt1++;
 	return 0;

@@ -272,19 +272,18 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			unsigned long int pc =  regs.regs.ARM_pc;
 #endif
             //do_backtrace(new_child, 0, 1);
+
             if (WIFSTOPPED(status)) {
 
-            	//printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx ", new_child, status, WSTOPSIG(status), pc);
+            	printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx ", new_child, status, WSTOPSIG(status), pc);
 
 				if(WSTOPSIG(status)== SIGTRAP)
 				{
-					//YELLOWprintf("ptrace_event:%d, sig:%d \n", ptrace_event, sig);
-					//YELLOWprintf("pc:%#lx, opc:%#lx,g_entryCnt:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt);
-					
+					YELLOWprintf("ptrace_event:%d, sig:%d \n", ptrace_event, sig);
 					if (ptrace_event == PTRACE_EVENT_EXEC) 
 					{
 						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-						printf("PTRACE_EVENT_EXEC child %d", clone_child);  
+						YELLOWprintf("PTRACE_EVENT_EXEC child %d", clone_child);  
 						if(maxChildPid < clone_child)
 							maxChildPid = clone_child;
 					}
@@ -294,10 +293,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
 						//printf("PTRACE_EVENT_CLONE: new_child: %d, clone_child: %d", new_child, clone_child);  
 						YELLOWprintf("pid %d create", clone_child);
-						ptrace(PTRACE_SETOPTIONS, clone_child, NULL, PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE | PTRACE_O_TRACEEXEC);
+						//ptrace(PTRACE_SETOPTIONS, clone_child, NULL, PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE | PTRACE_O_TRACEEXEC);
 						if(maxChildPid < clone_child)
 							maxChildPid = clone_child;
-						//new_child = clone_child;
 					}
 
 					if (ptrace_event == PTRACE_EVENT_EXIT) 
@@ -306,7 +304,20 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						getPidName(new_child, pidName);
 						YELLOWprintf("pid %d %s exit", new_child, pidName);
 					}	
-
+					if (ptrace_event == PTRACE_EVENT_VFORK) 
+					{
+						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
+						YELLOWprintf("PTRACE_EVENT_VFORK child %d", clone_child);  
+						if(maxChildPid < clone_child)
+							maxChildPid = clone_child;
+					}
+					if (ptrace_event == PTRACE_EVENT_FORK) 
+					{
+						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
+						YELLOWprintf("PTRACE_EVENT_FORK child %d", clone_child);  
+						if(maxChildPid < clone_child)
+							maxChildPid = clone_child;
+					}
 				}
 
 				if(WSTOPSIG(status)== SIGILL)
@@ -359,7 +370,6 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						g_entryCnt--;
 						//printf("[%d] function_return: symbol:%s, RA:%#lx, ret=%#lx, argv1=%#lx, argv2=%#lx, pid:%d, g_entryCnt:%d", new_child, bp->name, bb->return_addr, regs.regs.ARM_r0, bb->arg1, bb->arg2, bb->pid,g_entryCnt);
 
-						ptrace(PTRACE_CONT,new_child, NULL, NULL);
 					}
 
 					// maybe pc in breakpoint
@@ -394,10 +404,9 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							printf("call dlopen: %s ", dlname);
 						}
 #endif
-						ptrace(PTRACE_CONT,new_child, NULL, NULL);
 					}
 
-					//ptrace(PTRACE_CONT,new_child, NULL, NULL);
+					ptrace(PTRACE_CONT,new_child, NULL, NULL);
 				}
 
 				if(WSTOPSIG(status)== SIGINT)
@@ -427,6 +436,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			}
 
 			if(WIFEXITED(status)) {
+
 				if(new_child==-1)
 				{
 					printf("exit");
