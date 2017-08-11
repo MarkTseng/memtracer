@@ -229,7 +229,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 		new_child = waitpid(g_child, &status, __WALL);
 		if (WIFSTOPPED(status)) {
 			printf("pid: %d, stop signal: %d", new_child, WSTOPSIG(status));  
-			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE | PTRACE_O_TRACEEXEC);
+			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT);
             /* breakpoint in main */
 			main_orig_opc = setbreakpoint(g_child, main_addr);
 		}
@@ -279,7 +279,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 				if(WSTOPSIG(status)== SIGTRAP)
 				{
-					YELLOWprintf("ptrace_event:%d, sig:%d \n", ptrace_event, sig);
+					//YELLOWprintf("ptrace_event:%d, sig:%d \n", ptrace_event, sig);
 					if (ptrace_event == PTRACE_EVENT_EXEC) 
 					{
 						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
