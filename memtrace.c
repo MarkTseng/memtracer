@@ -68,6 +68,18 @@ unsigned long int main_orig_opc = 0;
 
 const char *opt_debug_info_file;
 
+pthread_t jobqueue_thread;;
+int job_queue_exit = 0;
+void *jobqueue(void *x_void_ptr)
+{
+	while(!job_queue_exit)
+	{
+		printf("do queue\n");
+		sleep(1);
+	}
+	return NULL;
+}
+
 void deleteAllList()
 {
 	brpSymbol *current_brp, *brp_tmp;
@@ -187,10 +199,18 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
     printf("main addr = %#lx", main_addr);
 
 	signal(SIGINT, signal_handler);
-
-	g_child = fork();
-
 	backtrace_init();
+	
+#if 0
+	if(pthread_create(&jobqueue_thread, NULL, jobqueue, NULL)) {
+
+		fprintf(stderr, "Error creating thread\n");
+		return 1;
+	}
+	pthread_detach(jobqueue_thread);
+#endif
+	// fork child
+	g_child = fork();
 	if (!g_child) {
 		ptrace(PTRACE_TRACEME, g_child,0,0);
 		execve(path, argv, envp);
@@ -199,28 +219,35 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 		g_mainPid = getpid();
         printf("g_child: %d", g_child);
         printf("g_mainPid: %d", g_mainPid);
+#if 1
 		param.sched_priority = sched_get_priority_max(SCHED_FIFO);
 		if( sched_setscheduler( 0, SCHED_FIFO, &param ) == -1 ) {
 			perror("no permission to get SCHED_FIFO");
 			exit(1);
 		}
-		new_child = waitpid(-1, &status, __WALL);
+#endif
+		new_child = waitpid(g_child, &status, __WALL);
 		if (WIFSTOPPED(status)) {
 			printf("pid: %d, stop signal: %d", new_child, WSTOPSIG(status));  
-			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT);
+			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE | PTRACE_O_TRACEEXEC);
             /* breakpoint in main */
 			main_orig_opc = setbreakpoint(g_child, main_addr);
 		}
 		ptrace(PTRACE_CONT,new_child, NULL, NULL);
+
         /* trace pid */
 		while(1) {
-            new_child = waitpid(-1, &status, __WALL|WUNTRACED);
+			errno = 0;
+            new_child = waitpid(-1, &status, __WALL);
 
-			if (new_child < 0) {
-				if (errno == EINTR) {
-					continue;
+			if (new_child == -1) {
+				if (errno == ECHILD) {
+					printf("event: No more traced programs: exiting");
+					break;
+				} else if (errno == EINTR) {
+					printf("event: none (wait received EINTR?)");
 				}
-				perror("\n== Error on waitpid()");
+				perror("wait");
 				break;
 			}
 
@@ -239,22 +266,25 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			ptrace_event = (status >> 16) & 0xff;
 			sig = WSTOPSIG(status);
             //dump_regs(&regs, stdout);
-            //printf("[wait] status:%#x , sig:%d, pid:%d ", status, WSTOPSIG(status), new_child);
 #ifndef RPI
 			unsigned long int pc =  regs.regs.ARM_pc + 1;
 #else
 			unsigned long int pc =  regs.regs.ARM_pc;
 #endif
+            //do_backtrace(new_child, 0, 1);
             if (WIFSTOPPED(status)) {
+
+            	//printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx ", new_child, status, WSTOPSIG(status), pc);
 
 				if(WSTOPSIG(status)== SIGTRAP)
 				{
 					//YELLOWprintf("ptrace_event:%d, sig:%d \n", ptrace_event, sig);
 					//YELLOWprintf("pc:%#lx, opc:%#lx,g_entryCnt:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt);
+					
 					if (ptrace_event == PTRACE_EVENT_EXEC) 
 					{
 						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-						//printf("PTRACE_EVENT_EXEC child %d", clone_child);  
+						printf("PTRACE_EVENT_EXEC child %d", clone_child);  
 						if(maxChildPid < clone_child)
 							maxChildPid = clone_child;
 					}
@@ -264,6 +294,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
 						//printf("PTRACE_EVENT_CLONE: new_child: %d, clone_child: %d", new_child, clone_child);  
 						YELLOWprintf("pid %d create", clone_child);
+						ptrace(PTRACE_SETOPTIONS, clone_child, NULL, PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE | PTRACE_O_TRACEEXEC);
 						if(maxChildPid < clone_child)
 							maxChildPid = clone_child;
 						//new_child = clone_child;
@@ -280,7 +311,58 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 				if(WSTOPSIG(status)== SIGILL)
                 {  
-					//printf("[%d] PC:%#lx", new_child, pc);
+#if 0
+					bp = breakpoint_by_entry(pc);
+					if(bp != NULL)
+            			printf("[%d][STOP][SIGILL] status:%#x , sig:%d, g_entryCnt:%d, pc:%#lx, symbol:%s", new_child, status, WSTOPSIG(status), g_entryCnt, pc, bp->name);
+					else
+            			printf("[%d][STOP][SIGILL] status:%#x , sig:%d, g_entryCnt:%d, pc:%#lx", new_child, status, WSTOPSIG(status), g_entryCnt, pc);
+#endif					
+					struct breakblock_s *bb = NULL;
+					bb = breakblock_search(pc, new_child);
+					if(bb!=NULL)
+					{
+						/* -- at function return */
+						clearbreakpoint(new_child, bb->return_addr, bb->return_opc);
+						bp = breakpoint_by_entry(bb->entry_addr);
+						//do_backtrace(new_child, pc,0);
+#if 0
+						if(strcmp("dlopen", bp->name) == 0)
+						{
+							int i;
+							const char *path = NULL;
+							size_t start, end;
+							for(i=g_child;i<=maxChildPid;i++)
+							{
+								path = proc_maps_by_name(new_child, dlname,&start, &end);
+								if(path != NULL)
+								{	
+									//printf("pid:%d, solib path:%s, star%#x, end:%#x", i,path,start,end);
+									symtab_build_file(path, start, end);
+									break;
+								}
+							}
+						}
+#endif
+#if 1
+						if(bp)
+						{
+							bp->handler(new_child, regs.regs.ARM_r0, bb->arg1, bb->arg2);
+						}else{
+							YELLOWprintf("WARN: Can not found bp");
+						}
+#endif
+						/*restore instruction(s)*/
+						setbreakpoint(new_child, bb->entry_addr);
+						//do_backtrace(new_child, pc,0);
+						breakblock_delete(bb);
+						g_entryCnt--;
+						//printf("[%d] function_return: symbol:%s, RA:%#lx, ret=%#lx, argv1=%#lx, argv2=%#lx, pid:%d, g_entryCnt:%d", new_child, bp->name, bb->return_addr, regs.regs.ARM_r0, bb->arg1, bb->arg2, bb->pid,g_entryCnt);
+
+						ptrace(PTRACE_CONT,new_child, NULL, NULL);
+					}
+
+					// maybe pc in breakpoint
 					if ((bp = breakpoint_by_entry(pc)) != NULL)
 					{
 						/* recover entry code */
@@ -288,7 +370,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
 						/* set breakpoint at return address */
 						breaktrap1 = setbreakpoint(new_child, regs.regs.ARM_lr);
-						//printf("[%d] function_entry: symbol = %s, RA:%#lx, g_entryCnt=%d, argv1:%#lx, argv2:%#lx", new_child, bp->name, regs.regs.ARM_lr, g_entryCnt, regs.regs.ARM_r0, regs.regs.ARM_r1);
+						g_entryCnt++;
+						//printf("[%d] function_entry: symbol = %s, RA:%#lx, g_entryCnt=%d, argv1:%#lx, argv2:%#lx, g_entryCnt:%d", new_child, bp->name, regs.regs.ARM_lr, g_entryCnt, regs.regs.ARM_r0, regs.regs.ARM_r1,g_entryCnt);
 #if 0
 						brp = (brpSymbol*)malloc(sizeof(brpSymbol));
 						brp->return_addr = regs.regs.ARM_lr;
@@ -311,131 +394,12 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 							printf("call dlopen: %s ", dlname);
 						}
 #endif
-						g_entryCnt++;
-					} else {
-						struct breakblock_s *bb = NULL;
-						bb = breakblock_search(pc, new_child);
-						if(bb!=NULL)
-						{
-							/* -- at function return */
-							clearbreakpoint(new_child, bb->return_addr, bb->return_opc);
-							bp = breakpoint_by_entry(bb->entry_addr);
-							//do_backtrace(new_child, pc,0);
-#if 0
-							if(strcmp("dlopen", bp->name) == 0)
-							{
-								int i;
-								const char *path = NULL;
-								size_t start, end;
-								for(i=g_child;i<=maxChildPid;i++)
-								{
-									path = proc_maps_by_name(new_child, dlname,&start, &end);
-									if(path != NULL)
-									{	
-										//printf("pid:%d, solib path:%s, star%#x, end:%#x", i,path,start,end);
-										symtab_build_file(path, start, end);
-										break;
-									}
-								}
-							}
-#endif
-							//printf("[%d] function_return: symbol:%s, RA:%#lx, ret=%#lx, argv1=%#lx, argv2=%#lx, pid:%d", new_child, bp->name, bb->return_addr, regs.regs.ARM_r0, bb->arg1, bb->arg2, bb->pid);
-							if(bp)
-							{
-								bp->handler(new_child, regs.regs.ARM_r0, bb->arg1, bb->arg2);
-							}else{
-								YELLOWprintf("WARN: Can not found bp: pc:%#lx, g_entryCnt:%d, pid:%d in hashlist", pc, g_entryCnt, new_child);
-							}
-							
-							/*restore instruction(s)*/
-							setbreakpoint(new_child, bb->entry_addr);
-							do_backtrace(new_child, pc,0);
-							breakblock_delete(bb);
-							g_entryCnt--;
-						} else {
-							YELLOWprintf("WARN: Can not found pc:%#lx, g_entryCnt:%d, pid:%d in hashlist", pc, g_entryCnt, new_child);
-							//dumpAllBrkList(new_child);
-							//dump_regs(&regs, stdout);
-    						breakblock_dump(0);
-                    		do_backtrace(new_child, 0, 1);
-						}
-#if 0
-						HASH_FIND_INT(brptab, &pc, brp);
-						if(brp){
-							g_entryCnt--;
-							/* -- at function return */
-							clearbreakpoint(new_child, brp->return_addr, brp->return_opc);
-							bp = breakpoint_by_entry( brp->entry_addr);
-							do_backtrace(new_child, brp->return_addr,0);
-							if(strcmp("dlopen", bp->name) == 0)
-							{
-								int i;
-								const char *path = NULL;
-								size_t start, end;
-								for(i=g_child;i<=maxChildPid;i++)
-								{
-									path = proc_maps_by_name(new_child, dlname,&start, &end);
-									if(path != NULL)
-									{	
-										//printf("pid:%d, solib path:%s, star%#x, end:%#x", i,path,start,end);
-										symtab_build_file(path, start, end);
-										break;
-									}
-								}
-							}
-							printf("[%d] function_return: symbol:%s, RA:%#lx, ret=%#lx, argv1=%#lx, argv2=%#lx, pid:%d", new_child, bp->name, brp->return_addr, regs.regs.ARM_r0, brp->arg1, brp->arg2, brp->pid);
-                    		//do_backtrace(new_child, 0, 1);
-							if (bp->handler(new_child, regs.regs.ARM_r0, brp->arg1, brp->arg2) != 0) {
-								printf("\n== Not enough memory.");
-								break;
-							}
-							
-							/*restore instruction(s)*/
-							//printf("recovery breakpoin entry_address:%#x", brp->entry_addr);
-							breaktrap2 = setbreakpoint(new_child, brp->entry_addr);
-							HASH_DEL(brptab, brp);
-							free(brp);
-						}else{
-							YELLOWprintf("WARN: Can not found pc:%#lx, opc:%#lx,g_entryCnt:%d, pid:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt, new_child);
-							//dumpAllBrkList(new_child);
-							//dump_regs(&regs, stdout);
-                    		//do_backtrace(new_child, 0, 1);
-						}
-#endif
+						ptrace(PTRACE_CONT,new_child, NULL, NULL);
 					}
+
+					//ptrace(PTRACE_CONT,new_child, NULL, NULL);
 				}
 
-#if 0
-				if(WSTOPSIG(status)== SIGTRAP)
-				{
-					//YELLOWprintf("ptrace_event:%d, sig:%d \n", ptrace_event, sig);
-					//YELLOWprintf("pc:%#lx, opc:%#lx,g_entryCnt:%d in hashlist", pc, ptrace(PTRACE_PEEKTEXT, new_child, pc), g_entryCnt);
-					if (ptrace_event == PTRACE_EVENT_EXEC) 
-					{
-						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-						//printf("PTRACE_EVENT_EXEC child %d", clone_child);  
-						if(maxChildPid < clone_child)
-							maxChildPid = clone_child;
-					}
-
-					if (ptrace_event == PTRACE_EVENT_CLONE) 
-					{
-						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
-						//printf("PTRACE_EVENT_CLONE: new_child: %d, clone_child: %d", new_child, clone_child);  
-						printf("pid %d create", clone_child);
-						if(maxChildPid < clone_child)
-							maxChildPid = clone_child;
-					}
-
-					if (ptrace_event == PTRACE_EVENT_EXIT) 
-					{
-						memset(pidName,0,sizeof(pidName));
-						getPidName(new_child, pidName);
-						printf("pid %d %s exit", new_child, pidName);
-					}	
-
-				}
-#endif
 				if(WSTOPSIG(status)== SIGINT)
 				{
 					ptrace(PTRACE_CONT, new_child, NULL, SIGINT);
@@ -460,19 +424,16 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					dump_regs(&regs, stdout);
                     break;
                 }
-				ptrace(PTRACE_CONT,new_child, NULL, NULL);
 			}
 
 			if(WIFEXITED(status)) {
 				if(new_child==-1)
 				{
-					break;
-				}
-				if(new_child==g_child)
-				{
+					printf("exit");
 					break;
 				}
 			}
+			ptrace(PTRACE_CONT,new_child, NULL, NULL);
 		}
 	}
 
