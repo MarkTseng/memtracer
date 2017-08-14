@@ -24,7 +24,7 @@ struct symbol_s {
 	char		name[128];
 };
 
-static ARRAY(g_symbol_table, struct symbol_s, 1000);
+static ARRAY(g_symbol_table, struct symbol_s, 10000);
 
 static int symtab_build_section(Elf *elf, Elf_Scn *section,
 		uintptr_t offset, uintptr_t base_addr)
@@ -212,6 +212,17 @@ uintptr_t symtab_by_name(const char *name)
 	}
 	return address;
 }
+
+uintptr_t symtab_dump()
+{
+	uintptr_t address = 0;
+	struct symbol_s *sym;
+	array_for_each(sym, &g_symbol_table) {
+		printf("[%s] symbol:%s, addr: %#lx, weak:%d",__func__, sym->name, sym->address, sym->weak);
+	}
+	return address;
+}
+
 
 
 #define ERR -1

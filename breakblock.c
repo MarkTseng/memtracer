@@ -8,7 +8,7 @@
 
 static LIST_HEAD(g_breakblock_active);
 
-int breakblock_new(long return_addr, long return_opc, long entry_addr, long entry_opc, long arg1, long arg2, int pid)
+int breakblock_new(long return_addr, long return_opc, long entry_addr, long entry_opc, long arg1, long arg2, int pid, char *symbol)
 {
 	if (return_addr == 0) {
 		printf("Warning: alloc returns NULL at\n");
@@ -19,6 +19,7 @@ int breakblock_new(long return_addr, long return_opc, long entry_addr, long entr
 	if (bb == NULL) {
 		return -1;
 	}
+	memset(bb, 0, sizeof(struct breakblock_s));
 	bb->return_addr = return_addr;
     bb->return_opc = return_opc;   
     bb->entry_addr = entry_addr; 
@@ -26,10 +27,11 @@ int breakblock_new(long return_addr, long return_opc, long entry_addr, long entr
     bb->arg1 = arg1;
     bb->arg2 = arg2;
     bb->pid = pid;
+	strncpy(bb->symbol, symbol, 31);
 	list_add_tail(&bb->list_node, &g_breakblock_active);
 
-    //printf("[breakblock_new]\n");
-    //breakblock_dump(0);
+    printf("[breakblock_new]\n");
+    breakblock_dump(0);
 	return 0;
 }
 
@@ -50,8 +52,8 @@ struct breakblock_s *breakblock_search(uintptr_t return_addr, int pid)
 
 	list_for_each(p, &g_breakblock_active) {
 		bb = list_entry(p, struct breakblock_s, list_node);
-        //if( (return_addr == bb->return_addr)&&(pid == bb->pid))
-        if((return_addr == bb->return_addr))
+        if( (return_addr == bb->return_addr)&&(pid == bb->pid))
+        //if((return_addr == bb->return_addr))
         {
             return bb;
         }
@@ -69,7 +71,7 @@ void breakblock_dump(int freeall)
 	{
         list_for_each(p, &g_breakblock_active) {
 		    bb = list_entry(p, struct breakblock_s, list_node);
-            printf("return_addr:%#lx, entry_addr: %#lx, pid:%d\n", bb->return_addr, bb->entry_addr, bb->pid);
+            printf("return_addr:%#lx, entry_addr: %#lx(%s), pid:%d\n", bb->return_addr, bb->entry_addr, bb->symbol, bb->pid);
 	    }
     }
 

@@ -23,8 +23,10 @@ typedef struct user_regs_struct registers_info_t;
 #define E_FORK 3
 #define E_PTRACE 4
 #define E_UNKNOWN 5
-#define TRAPINT (0xe7ffffff)
-#define TRAPHALF (0xdeff)
+//#define TRAPINT (0xe7ffffff)
+#define TRAPINT (0xe7f001f0) //{ 0xf0, 0x01, 0xf0, 0xe7 }
+//#define TRAPHALF (0xde01)
+#define TRAPHALF (0xde01) //{ 0x01, 0xde }
 
 int isintbreakpoint(int trapint, int lsb);
 unsigned long readchildword(pid_t pid, unsigned long addr);

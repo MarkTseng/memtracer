@@ -229,7 +229,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 		new_child = waitpid(g_child, &status, __WALL);
 		if (WIFSTOPPED(status)) {
 			printf("pid: %d, stop signal: %d", new_child, WSTOPSIG(status));  
-			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT);
+			ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT | PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACESECCOMP | PTRACE_O_TRACEVFORKDONE | PTRACE_O_EXITKILL);
             /* breakpoint in main */
 			main_orig_opc = setbreakpoint(g_child, main_addr);
 		}
@@ -275,7 +275,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 
             if (WIFSTOPPED(status)) {
 
-            	printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx ", new_child, status, WSTOPSIG(status), pc);
+            	printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx, opc:%#lx ", new_child, status, WSTOPSIG(status), pc, readchildword(new_child, pc));
 
 				if(WSTOPSIG(status)== SIGTRAP)
 				{
@@ -293,7 +293,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						ptrace(PTRACE_GETEVENTMSG, new_child, 0, &clone_child);
 						//printf("PTRACE_EVENT_CLONE: new_child: %d, clone_child: %d", new_child, clone_child);  
 						YELLOWprintf("pid %d create", clone_child);
-						//ptrace(PTRACE_SETOPTIONS, clone_child, NULL, PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE | PTRACE_O_TRACEEXEC);
+						ptrace(PTRACE_SETOPTIONS, new_child, NULL, PTRACE_O_TRACECLONE | PTRACE_O_TRACEVFORK | PTRACE_O_TRACEFORK | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT | PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACESECCOMP | PTRACE_O_TRACEVFORKDONE | PTRACE_O_EXITKILL);
 						if(maxChildPid < clone_child)
 							maxChildPid = clone_child;
 					}
@@ -320,7 +320,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					}
 				}
 
-				if(WSTOPSIG(status)== SIGILL)
+				if(WSTOPSIG(status)== SIGTRAP)
                 {  
 #if 0
 					bp = breakpoint_by_entry(pc);
@@ -358,7 +358,10 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 #if 1
 						if(bp)
 						{
-							bp->handler(new_child, regs.regs.ARM_r0, bb->arg1, bb->arg2);
+							if(bp->handler(new_child, regs.regs.ARM_r0, bb->arg1, bb->arg2))
+							{
+								dump_regs(&regs, stdout);
+							}
 						}else{
 							YELLOWprintf("WARN: Can not found bp");
 						}
@@ -370,6 +373,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						g_entryCnt--;
 						//printf("[%d] function_return: symbol:%s, RA:%#lx, ret=%#lx, argv1=%#lx, argv2=%#lx, pid:%d, g_entryCnt:%d", new_child, bp->name, bb->return_addr, regs.regs.ARM_r0, bb->arg1, bb->arg2, bb->pid,g_entryCnt);
 
+						ptrace(PTRACE_CONT,new_child, NULL, NULL);
+						continue;
 					}
 
 					// maybe pc in breakpoint
@@ -393,7 +398,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						brp->pid = new_child;
 						HASH_ADD_INT(brptab, return_addr, brp);
 #endif
-						breakblock_new(regs.regs.ARM_lr, breaktrap1, bp->entry_address, bp->entry_code, regs.regs.ARM_r0, regs.regs.ARM_r1, new_child);
+						breakblock_new(regs.regs.ARM_lr, breaktrap1, bp->entry_address, bp->entry_code, regs.regs.ARM_r0, regs.regs.ARM_r1, new_child, bp->name);
 
 #if 1
 						unsigned long int arg1 = regs.regs.ARM_r0;
@@ -407,6 +412,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					}
 
 					ptrace(PTRACE_CONT,new_child, NULL, NULL);
+					continue;
 				}
 
 				if(WSTOPSIG(status)== SIGINT)
@@ -444,6 +450,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 				}
 			}
 			ptrace(PTRACE_CONT,new_child, NULL, NULL);
+            YELLOWprintf("[%d][WARN] status:%#x , sig:%d, pc:%#lx ", new_child, status, WSTOPSIG(status), pc);
 		}
 	}
 
