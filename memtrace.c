@@ -259,6 +259,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 				clearbreakpoint(g_child, main_addr, main_orig_opc);
 				printf("clearbreakpoint main_addr:%#lx", main_addr);
 				g_readelf = 1;
+				ptrace(PTRACE_CONT,new_child, NULL, NULL);
+				continue;
 			}
 
             memset(&regs, 0, sizeof(regs));
@@ -267,16 +269,23 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			sig = WSTOPSIG(status);
             //dump_regs(&regs, stdout);
 #ifndef RPI
-			unsigned long int pc =  regs.regs.ARM_pc + 1;
+			unsigned long int pc =  regs.regs.ARM_pc ;
 #else
 			unsigned long int pc =  regs.regs.ARM_pc;
 #endif
-            //do_backtrace(new_child, 0, 1);
+			if(pc == 0x0)
+			{
+            	//dump_regs(&regs, stdout);
+				continue;
+			}
 
+			unsigned long int pc_opc =  readchildword(new_child, pc);
+				
+            //do_backtrace(new_child, 0, 1);
+			
             if (WIFSTOPPED(status)) {
 
-            	printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx, opc:%#lx ", new_child, status, WSTOPSIG(status), pc, readchildword(new_child, pc));
-
+            	printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx, opc:%#lx, brkp:%d ", new_child, status, WSTOPSIG(status), pc, pc_opc,isbreakpoint(pc_opc));
 				if(WSTOPSIG(status)== SIGTRAP)
 				{
 					//YELLOWprintf("ptrace_event:%d, sig:%d \n", ptrace_event, sig);
@@ -303,6 +312,8 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						memset(pidName,0,sizeof(pidName));
 						getPidName(new_child, pidName);
 						YELLOWprintf("pid %d %s exit", new_child, pidName);
+						ptrace(PTRACE_CONT,new_child, NULL, NULL);
+						continue;
 					}	
 					if (ptrace_event == PTRACE_EVENT_VFORK) 
 					{
@@ -320,6 +331,12 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					}
 				}
 
+				if(!isbreakpoint(pc_opc))
+				{
+					ptrace(PTRACE_CONT,new_child, NULL, NULL);
+					continue;
+				}
+
 				if(WSTOPSIG(status)== SIGTRAP)
                 {  
 #if 0
@@ -330,7 +347,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
             			printf("[%d][STOP][SIGILL] status:%#x , sig:%d, g_entryCnt:%d, pc:%#lx", new_child, status, WSTOPSIG(status), g_entryCnt, pc);
 #endif					
 					struct breakblock_s *bb = NULL;
-					bb = breakblock_search(pc, new_child);
+					bb = breakblock_search(pc+1, new_child);
 					if(bb!=NULL)
 					{
 						/* -- at function return */
@@ -378,7 +395,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					}
 
 					// maybe pc in breakpoint
-					if ((bp = breakpoint_by_entry(pc)) != NULL)
+					if ((bp = breakpoint_by_entry(pc+1)) != NULL)
 					{
 						/* recover entry code */
 						clearbreakpoint(new_child, bp->entry_address, bp->entry_code);

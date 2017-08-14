@@ -14,17 +14,18 @@ static int addCnt1 = 0;
 static int delCnt1 = 0;
 static int bph_malloc(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
-	log_debug("[%d] malloc [%d] pointer:%#lx, size: %#lx\n", pid, addCnt1,pointer, size);
+	//log_debug("[%d] malloc [%d] pointer:%#lx, size: %#lx\n", pid, addCnt1,pointer, size);
 	memblock_new(pointer, size, pid);
 	addCnt1++;
-   	//do_backtrace(pid, 0, 1);
+	//if((long) size == 0x500)
+   	//	do_backtrace(pid, 0, 1);
 	return 0;
 }
 
 #if 1
 static int bph_new(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
-	log_debug("[%d] new pointer:%#lx size:%ld\n", pid, pointer, size);
+	//log_debug("[%d] new pointer:%#lx size:%ld\n", pid, pointer, size);
 	addCnt1++;
 	memblock_new(pointer, size, pid);
    	//do_backtrace(pid, 0, 1);
@@ -34,7 +35,7 @@ static int bph_new(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 
 static int bph_newa(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 {
-	log_debug("[%d] newa pointer:%#lx size:%ld\n", pid, pointer, size);
+	//log_debug("[%d] newa pointer:%#lx size:%ld\n", pid, pointer, size);
 	addCnt1++;
 	memblock_new(pointer, size, pid);
    	//do_backtrace(pid, 0, 1);
@@ -44,7 +45,7 @@ static int bph_newa(int pid, uintptr_t pointer, uintptr_t size, uintptr_t none)
 
 static int bph_delete(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	log_debug("[%d] delete pointer:%#lx\n", pid, pointer);
+	//log_debug("[%d] delete pointer:%#lx\n", pid, pointer);
    	//do_backtrace(pid, 0, 1);
 	if((memblock_search(pointer)==NULL))
 	{	
@@ -61,7 +62,7 @@ static int bph_delete(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t non
 
 static int bph_deletea(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	log_debug("[%d] deletea pointer:%#lx\n", pid, pointer);
+	//log_debug("[%d] deletea pointer:%#lx\n", pid, pointer);
    	//do_backtrace(pid, 0, 1);
 	if((memblock_search(pointer)==NULL))
 	{	
@@ -79,14 +80,14 @@ static int bph_deletea(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t no
 
 static int bph_dlopen(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	log_debug("[%d] dlopen ret:%#x, p1:%#x, p2:%#x\n", pid, none1, pointer, none2);
+	//log_debug("[%d] dlopen ret:%#x, p1:%#x, p2:%#x\n", pid, none1, pointer, none2);
 
 	return 0;
 }
 
 static int bph_free(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2)
 {
-	log_debug("[%d]free [%d] point:%#lx, ret:%#lx, arg2:%#lx", pid, delCnt1, pointer, none1, none2);
+	//log_debug("[%d]free [%d] point:%#lx, ret:%#lx, arg2:%#lx", pid, delCnt1, pointer, none1, none2);
 	if((memblock_search(pointer)==NULL) && (pointer !=0))
 	{	
 		log_debug("[%d] not found free point:%#lx\n", pid, pointer);
@@ -112,7 +113,7 @@ static int bph_free(int pid, uintptr_t none1, uintptr_t pointer, uintptr_t none2
 
 static int bph_backtrace(int pid, uintptr_t ret, uintptr_t arg1, uintptr_t arg2)
 {
-	log_debug("[%d] backtrace: ret:%lx, arg1:%#x, arg2:%#x \n", pid, ret, arg1, arg2);
+	//log_debug("[%d] backtrace: ret:%lx, arg1:%#x, arg2:%#x \n", pid, ret, arg1, arg2);
     do_backtrace(pid, 0, 1);
 	return 0;
 }
@@ -120,7 +121,7 @@ static int bph_backtrace(int pid, uintptr_t ret, uintptr_t arg1, uintptr_t arg2)
 
 static int bph_realloc(int pid, uintptr_t new_pointer, uintptr_t old_pointer, uintptr_t size)
 {
-	log_debug("[%d] realloc pointer:%#lx->%#lx size:%ld\n", pid, old_pointer, new_pointer, size);
+	//log_debug("[%d] realloc pointer:%#lx->%#lx size:%ld\n", pid, old_pointer, new_pointer, size);
     if (new_pointer == old_pointer) {
         memblock_update_size(memblock_search(old_pointer), size);
     } else {
@@ -137,7 +138,7 @@ static int bph_calloc(int pid, uintptr_t pointer, uintptr_t nmemb, uintptr_t siz
 {
 	if(memblock_search(pointer)==NULL)
 	{
-		log_debug("[%d] calloc [%d] pointer:%#lx nmemb:%#lx size:%#lx, total:%#lx\n", pid, addCnt1, pointer, nmemb, size, nmemb * size);
+		//log_debug("[%d] calloc [%d] pointer:%#lx nmemb:%#lx size:%#lx, total:%#lx\n", pid, addCnt1, pointer, nmemb, size, nmemb * size);
 		memblock_new(pointer, nmemb * size, pid);
 		addCnt1++;
    		//do_backtrace(pid, 0, 1);
@@ -147,14 +148,14 @@ static int bph_calloc(int pid, uintptr_t pointer, uintptr_t nmemb, uintptr_t siz
 
 static int bph_mmap(int pid, uintptr_t ret_map_addr, uintptr_t none1, uintptr_t length)
 {
-	log_debug("[%d] mmap addr:%#x, length:%#x\n", pid, ret_map_addr, length);
+	//log_debug("[%d] mmap addr:%#x, length:%#x\n", pid, ret_map_addr, length);
 
 	return 0;
 }
 
 static int bph_munmap(int pid, uintptr_t none1, uintptr_t unmap_addr, uintptr_t length)
 {
-	log_debug("[%d] munmap addr:%#x, length:%#x\n", pid, unmap_addr, length);
+	//log_debug("[%d] munmap addr:%#x, length:%#x\n", pid, unmap_addr, length);
 
 	return 0;
 }

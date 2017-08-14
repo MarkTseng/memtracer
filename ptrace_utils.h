@@ -28,6 +28,7 @@ typedef struct user_regs_struct registers_info_t;
 //#define TRAPHALF (0xde01)
 #define TRAPHALF (0xde01) //{ 0x01, 0xde }
 
+int isbreakpoint(int opc);
 int isintbreakpoint(int trapint, int lsb);
 unsigned long readchildword(pid_t pid, unsigned long addr);
 void writechildword(pid_t pid, unsigned long addr, unsigned long word);

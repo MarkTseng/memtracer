@@ -32,6 +32,19 @@ backTraceCacheTable *btctab=NULL, *btc;
 unw_addr_space_t as;
 struct UPT_info *ui;
 
+int isbreakpoint(int opc)
+{
+
+	if ( (opc == TRAPINT) ||
+		 ((opc & 0xffff) == TRAPHALF)  ||
+		 (((opc >> 16) & 0xffff) == TRAPHALF)) {
+		return 1;
+	} else {
+		return 0;
+	}
+
+}
+
 /* isintbreakpoint checks the supplied int to see if it contains a trap instruction */
 int isintbreakpoint(int trapint, int lsb)
 {

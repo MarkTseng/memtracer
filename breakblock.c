@@ -30,8 +30,8 @@ int breakblock_new(long return_addr, long return_opc, long entry_addr, long entr
 	strncpy(bb->symbol, symbol, 31);
 	list_add_tail(&bb->list_node, &g_breakblock_active);
 
-    printf("[breakblock_new]\n");
-    breakblock_dump(0);
+    //printf("[breakblock_new]\n");
+    //breakblock_dump(0);
 	return 0;
 }
 
