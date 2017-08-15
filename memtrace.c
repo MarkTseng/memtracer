@@ -269,7 +269,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 			sig = WSTOPSIG(status);
             //dump_regs(&regs, stdout);
 #ifndef RPI
-			unsigned long int pc =  regs.regs.ARM_pc ;
+			unsigned long int pc =  regs.regs.ARM_pc + 1;
 #else
 			unsigned long int pc =  regs.regs.ARM_pc;
 #endif
@@ -279,13 +279,17 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 				continue;
 			}
 
-			unsigned long int pc_opc =  readchildword(new_child, pc);
+			unsigned long int pc_opc =  readchildword(new_child, regs.regs.ARM_pc);
 				
             //do_backtrace(new_child, 0, 1);
-			
             if (WIFSTOPPED(status)) {
 
-            	printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx, opc:%#lx, brkp:%d ", new_child, status, WSTOPSIG(status), pc, pc_opc,isbreakpoint(pc_opc));
+				bp = breakpoint_by_entry(pc);
+				if(bp)
+					printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx(%s), opc:%#lx, brkp:%d ", new_child, status, WSTOPSIG(status), pc, bp->name, pc_opc,isbreakpoint(pc_opc));
+				else
+					printf("[%d][STOPPED] status:%#x , sig:%d, pc:%#lx, opc:%#lx, brkp:%d ", new_child, status, WSTOPSIG(status), pc, pc_opc,isbreakpoint(pc_opc));
+
 				if(WSTOPSIG(status)== SIGTRAP)
 				{
 					//YELLOWprintf("ptrace_event:%d, sig:%d \n", ptrace_event, sig);
@@ -342,12 +346,12 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 #if 0
 					bp = breakpoint_by_entry(pc);
 					if(bp != NULL)
-            			printf("[%d][STOP][SIGILL] status:%#x , sig:%d, g_entryCnt:%d, pc:%#lx, symbol:%s", new_child, status, WSTOPSIG(status), g_entryCnt, pc, bp->name);
+            			printf("[%d][STOP][SIGILL] status:%#x , sig:%d, g_entryCnt:%d, pc:%#lx, symbol:%s", new_child, status, WSTOPSIG(status), g_entryCnt, pc, bmp->name);
 					else
             			printf("[%d][STOP][SIGILL] status:%#x , sig:%d, g_entryCnt:%d, pc:%#lx", new_child, status, WSTOPSIG(status), g_entryCnt, pc);
 #endif					
 					struct breakblock_s *bb = NULL;
-					bb = breakblock_search(pc+1, new_child);
+					bb = breakblock_search(pc, new_child);
 					if(bb!=NULL)
 					{
 						/* -- at function return */
@@ -391,11 +395,12 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 						//printf("[%d] function_return: symbol:%s, RA:%#lx, ret=%#lx, argv1=%#lx, argv2=%#lx, pid:%d, g_entryCnt:%d", new_child, bp->name, bb->return_addr, regs.regs.ARM_r0, bb->arg1, bb->arg2, bb->pid,g_entryCnt);
 
 						ptrace(PTRACE_CONT,new_child, NULL, NULL);
+						//kill(new_child, SIGCONT);
 						continue;
 					}
 
 					// maybe pc in breakpoint
-					if ((bp = breakpoint_by_entry(pc+1)) != NULL)
+					if ((bp = breakpoint_by_entry(pc)) != NULL)
 					{
 						/* recover entry code */
 						clearbreakpoint(new_child, bp->entry_address, bp->entry_code);
@@ -429,6 +434,7 @@ int main(int argc __attribute__((unused)), char **argv, char **envp)
 					}
 
 					ptrace(PTRACE_CONT,new_child, NULL, NULL);
+					//kill(new_child, SIGCONT);
 					continue;
 				}
 
